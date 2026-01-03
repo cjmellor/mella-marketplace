@@ -1,0 +1,21 @@
+{
+  "name": "mella-marketplace",
+  "owner": {
+    "name": "Chris",
+    "email": ""
+  },
+  "metadata": {
+    "description": "Mella's curated marketplace of Claude Code plugins",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "mella",
+      "source": "./plugins/mella",
+      "description": "Mella's collection of productivity tools for Claude Code",
+      "version": "1.0.0",
+      "keywords": ["testing", "walkthrough", "documentation", "qa"],
+      "license": "MIT"
+    }
+  ]
+}

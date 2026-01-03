@@ -1,0 +1,10 @@
+{
+  "name": "mella",
+  "version": "1.0.0",
+  "description": "Mella's collection of productivity tools for Claude Code",
+  "author": {
+    "name": "Chris"
+  },
+  "keywords": ["testing", "walkthrough", "documentation", "qa"],
+  "license": "MIT"
+}
