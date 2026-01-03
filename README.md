@@ -8,9 +8,19 @@ A curated collection of plugins for [Claude Code](https://docs.anthropic.com/en/
 
 Productivity tools to streamline your development workflow.
 
+**Commands:**
+
 | Command | Description |
 |---------|-------------|
-| `/mella:walkthrough` | Auto-generates step-by-step testing guides for features and bug fixes. Detects changes from git staged files or PRs and creates comprehensive QA instructions. |
+| `/mella:walkthrough` | Auto-generates step-by-step testing guides for features and bug fixes |
+
+**Skills (auto-triggered):**
+
+| Skill | Triggers when... |
+|-------|------------------|
+| `walkthrough` | You ask Claude to "write a walkthrough", "create testing steps", or generate QA documentation |
+
+Skills are triggered automatically based on context. For example, after implementing a feature you can say "now write a walkthrough guide" and Claude will use the skill.
 
 ## Requirements
 
