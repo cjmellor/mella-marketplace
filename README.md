@@ -12,6 +12,7 @@ Productivity tools to streamline your development workflow.
 
 | Command | Description |
 |---------|-------------|
+| `/mella:commit` | Create git commits with optional intelligent grouping (`--group` flag) |
 | `/mella:walkthrough` | Auto-generates step-by-step testing guides for features and bug fixes |
 
 **Skills (auto-triggered):**
@@ -47,6 +48,10 @@ Skills are triggered automatically based on context. For example, after implemen
 **3. Start using:**
 
 ```bash
+# Create commits with intelligent grouping
+/mella:commit --group
+
+# Generate testing walkthroughs
 /mella:walkthrough
 ```
 
