@@ -1,5 +1,4 @@
 ---
-name: commit
 description: Create git commits with optional intelligent grouping
 argument-hint: "[--group]"
 allowed-tools: [Bash, Read, Grep, Glob]
