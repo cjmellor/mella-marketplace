@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-01-05
+
+### Added
+
+- **mella plugin** (v1.1.0)
+  - `commit` command - Create git commits with intelligent grouping via `/mella:commit --group`
+    - Standard mode: Creates single commit like standard commit command
+    - Grouped mode: Analyzes changes and creates separate, logical commits (e.g., dependencies vs source code)
+    - Auto-generates conventional commit messages
+    - Respects existing staged changes
+
 ## [1.0.0] - 2026-01-03
 
 ### Added

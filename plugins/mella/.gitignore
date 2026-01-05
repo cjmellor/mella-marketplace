@@ -1,0 +1,15 @@
+# macOS
+.DS_Store
+
+# Logs
+*.log
+
+# Node modules
+node_modules/
+
+# Environment files
+.env
+.env.local
+
+# Claude local settings
+.claude/*.local.md
