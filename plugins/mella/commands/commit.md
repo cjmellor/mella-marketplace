@@ -1,7 +1,7 @@
 ---
-description: Create git commits with optional intelligent grouping
-argument-hint: "[--group]"
-allowed-tools: [Bash, Read, Grep, Glob]
+description: Create git commits with optional intelligent grouping, push, and PR creation
+argument-hint: "[group] [pr] [push [branch]]"
+allowed-tools: [Bash, Read, Grep, Glob, AskUserQuestion]
 ---
 
 # Commit Command
@@ -11,11 +11,24 @@ Create git commits with optional intelligent grouping of changes.
 ## Usage
 
 - `/mella:commit` - Standard commit (like /commit-commands:commit)
-- `/mella:commit --group` - Analyze and group changes into logical commits
+- `/mella:commit group` - Analyze and group changes into logical commits
+- `/mella:commit pr` - Commit and use existing PR (or ask to create one)
+- `/mella:commit push` - Commit and push to current branch
+- `/mella:commit push origin/feature-branch` - Commit and push to specific branch
+- `/mella:commit group pr push` - Combine all options
 
 ## Instructions for Claude
 
 When this command is executed, follow these steps based on the arguments:
+
+### Argument Parsing
+
+Check `$ARGUMENTS` for the following flags:
+- `group` - Enable intelligent grouping of commits
+- `pr` - Handle pull request (check if exists, or ask to create)
+- `push` - Push commits after creating them (optionally to a specific branch)
+
+Parse the branch name for `push` by extracting any argument that comes after the word "push" in `$ARGUMENTS`.
 
 ### Standard Mode (no arguments)
 
@@ -34,9 +47,9 @@ If no arguments provided, execute the standard commit workflow:
    ```
 7. Run `git status` after commit to verify
 
-### Grouped Mode (--group flag)
+### Grouped Mode (group flag)
 
-If `--group` argument is provided, execute the intelligent grouping workflow:
+If `group` argument is provided, execute the intelligent grouping workflow:
 
 1. **Analyze all changes:**
    - Run `git status` to see all files (staged and unstaged)
@@ -71,6 +84,44 @@ If `--group` argument is provided, execute the intelligent grouping workflow:
    - Run `git status` to verify all changes were committed
    - Summarize what was done for the user
 
+### Pull Request Mode (pr flag)
+
+If `pr` argument is provided:
+
+1. **Check current branch:**
+   - Run `git rev-parse --abbrev-ref HEAD` to get the current branch name
+
+2. **Check if PR exists:**
+   - Run `gh pr view --json number,title,url` for the current branch
+   - If the command succeeds and returns a PR, use that PR (display the PR URL and title)
+
+3. **If no PR exists:**
+   - Use `AskUserQuestion` to ask the user: "No PR found for this branch. Do you want to create one?"
+   - If user says yes, create a PR after commits are made (see PR creation steps below)
+   - If user says no, skip PR creation
+
+4. **PR Creation (if requested):**
+   - After all commits are created and pushed, run `gh pr create --fill` to create the PR
+   - Display the created PR URL to the user
+
+### Push Mode (push flag)
+
+If `push` argument is provided:
+
+1. **Determine target branch:**
+   - Check if a branch name was specified after "push" in `$ARGUMENTS`
+   - If a branch is specified, push to that branch: `git push origin HEAD:<specified-branch>`
+   - If no branch is specified, push to the current branch: `git push`
+
+2. **Push after commits:**
+   - Wait until all commits are created (standard or grouped mode)
+   - Then execute the push operation
+   - Verify push succeeded with appropriate error handling
+
+3. **Handle push errors:**
+   - If push fails (e.g., remote branch doesn't exist), explain the error clearly
+   - Suggest fixes if appropriate (e.g., use `git push -u origin <branch>` for new branches)
+
 ### Important Notes
 
 - **Respect staged changes**: If files are already staged, keep them staged and include them in appropriate groups
@@ -78,6 +129,7 @@ If `--group` argument is provided, execute the intelligent grouping workflow:
 - **Commit message format**: Always follow conventional commit style and include Claude Code attribution
 - **Git safety**: Never use `--amend`, `--force`, or other destructive operations
 - **Error handling**: If a commit fails, explain the error and don't continue with remaining groups
+- **Argument combinations**: `group`, `pr`, and `push` can be used together in any combination
 
 ### Example Grouping Scenario
 
@@ -95,7 +147,10 @@ Group them as:
 
 ## Tips
 
-- Use `--group` when you have mixed changes that would benefit from separate commits
+- Use `group` when you have mixed changes that would benefit from separate commits
+- Use `pr` to automatically handle PR creation after committing
+- Use `push` to push commits immediately after creating them
+- Combine flags for complete workflows: `/mella:commit group pr push`
 - Standard mode is faster for single-purpose changes
 - Grouped mode creates cleaner git history for complex feature work
 - Each group should represent a logical, atomic change
