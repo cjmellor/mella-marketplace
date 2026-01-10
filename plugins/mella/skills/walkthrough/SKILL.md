@@ -1,8 +1,8 @@
 ---
 name: walkthrough
-description: Generate step-by-step walkthrough guides for testing features or bug fixes. Use when the user asks to create testing instructions, QA guides, walkthrough documentation, or says something like "write a walkthrough" or "create testing steps" after implementing a feature.
-allowed-tools: Bash, Read, Grep, Glob, Edit, Write, AskUserQuestion
-model: sonnet
+description: Generate step-by-step walkthrough guides for testing features or bug fixes. Auto-detects code changes from git diff or PR. Use when the user asks to create testing instructions, QA documentation, or says "write a walkthrough" after implementing a feature.
+allowed-tools: Bash, Read, Grep, Glob, Write, AskUserQuestion
+model: claude-sonnet-4-5
 ---
 
 # Feature Walkthrough Generator

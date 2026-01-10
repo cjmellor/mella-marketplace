@@ -1,7 +1,15 @@
 ---
+name: commit
 description: Create git commits with optional intelligent grouping, push, and PR creation
 argument-hint: "[group] [pr] [push [branch]]"
 allowed-tools: [Bash, Read, Grep, Glob, AskUserQuestion]
+hooks:
+  PreToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: "[ -f vendor/bin/pint ] && vendor/bin/pint --dirty || true"
+          once: true
 ---
 
 # Commit Command
@@ -41,7 +49,7 @@ If no arguments provided, execute the standard commit workflow:
 5. Stage relevant files with `git add`
 6. Create the commit with the message ending with:
    ```
-   🤖 Generated with [Claude Code](https://claude.com/claude-code)
+   Generated with [Claude Code](https://claude.com/claude-code)
 
    Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
    ```
@@ -141,9 +149,9 @@ Given these changes:
 - `tests/AuthTest.php` (new tests)
 
 Group them as:
-1. **Group 1**: `package.json`, `composer.json` → "Update dependencies"
-2. **Group 2**: `src/Controllers/UserController.php`, `src/Middleware/AuthMiddleware.php` → "Add authentication middleware"
-3. **Group 3**: `tests/AuthTest.php` → "Add authentication tests"
+1. **Group 1**: `package.json`, `composer.json` -> "Update dependencies"
+2. **Group 2**: `src/Controllers/UserController.php`, `src/Middleware/AuthMiddleware.php` -> "Add authentication middleware"
+3. **Group 3**: `tests/AuthTest.php` -> "Add authentication tests"
 
 ## Tips
 
