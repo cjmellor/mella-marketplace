@@ -47,12 +47,7 @@ If no arguments provided, execute the standard commit workflow:
 3. Run `git log -5 --oneline` to understand commit message style
 4. Analyze the changes and draft a concise commit message
 5. Stage relevant files with `git add`
-6. Create the commit with the message ending with:
-   ```
-   Generated with [Claude Code](https://claude.com/claude-code)
-
-   Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
-   ```
+6. Create the commit
 7. Run `git status` after commit to verify
 
 ### Grouped Mode (group flag)
@@ -84,7 +79,7 @@ If `group` argument is provided, execute the intelligent grouping workflow:
      - Use imperative mood ("Add feature" not "Added feature")
      - Be specific about what changed and why
      - Examples: "Update dependencies", "Add authentication middleware", "Fix user validation bug"
-   - Create the commit with message ending with Claude Code attribution
+   - Create the commit
    - Verify the commit was created successfully
 
 4. **After all groups are committed:**
@@ -134,7 +129,7 @@ If `push` argument is provided:
 
 - **Respect staged changes**: If files are already staged, keep them staged and include them in appropriate groups
 - **Stage unstaged files**: Before committing, ensure all files to be committed are staged
-- **Commit message format**: Always follow conventional commit style and include Claude Code attribution
+- **Commit message format**: Always follow conventional commit style
 - **Git safety**: Never use `--amend`, `--force`, or other destructive operations
 - **Error handling**: If a commit fails, explain the error and don't continue with remaining groups
 - **Argument combinations**: `group`, `pr`, and `push` can be used together in any combination
