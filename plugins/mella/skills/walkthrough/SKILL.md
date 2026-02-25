@@ -87,6 +87,7 @@ Create a detailed, easy-to-follow testing guide that includes:
 
 ## Important Guidelines
 
+- **Explore the codebase before writing anything** - Never assume how the application works, what routes exist, or how the UI is structured. Always read the relevant source files (routes, views, controllers, components, configs) to build an accurate picture of the current state of the project before generating any instructions. Outdated assumptions lead to misleading walkthroughs.
 - **Focus only on the new feature** - Don't include unrelated features or general app navigation beyond what's needed
 - **Assume starting point is home page or appropriate entry point** - Don't require knowledge of hidden pages
 - **Be thorough but concise** - Include all necessary details but avoid redundancy
