@@ -14,9 +14,9 @@ Productivity tools to streamline your development workflow.
 
 | Skill | Description | Triggers when... |
 |-------|-------------|------------------|
-| `review` | Multi-agent code review with 5+ parallel agents, automatic fix-and-re-review cycles, and cross-session history. Supports loop mode for batch runs. | You invoke `/mella:review` or say "review my code", "check my changes" |
+| `review` | Multi-agent code review with 5+ parallel agents, automatic fix-and-re-review cycles, and cross-session history. Runs in an isolated context. Supports loop mode for batch runs. | You invoke `/mella:review` or say "review my code", "check my changes" |
 | `commit` | Create git commits with optional intelligent grouping (`group`), push (`push`), and PR creation (`pr`). Automatically runs Laravel Pint linter if available. | You invoke `/mella:commit` |
-| `walkthrough` | Auto-generates step-by-step testing guides for features and bug fixes | You ask Claude to "write a walkthrough", "create testing steps", or generate QA documentation |
+| `walkthrough` | Auto-generates step-by-step testing guides for features and bug fixes. Runs in an isolated context. | You ask Claude to "write a walkthrough", "create testing steps", or generate QA documentation |
 
 Skills can be invoked directly or triggered automatically based on context. For example, after implementing a feature you can say "now write a walkthrough guide" and Claude will use the skill.
 
