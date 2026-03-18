@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-03-18
+
+### Added
+
+- **mella plugin** (v1.2.0)
+  - `review` skill - Multi-agent code review with automatic fix-and-re-review cycles via `/mella:review`
+    - Runs 5+ specialized review agents in parallel (code quality, bugs, efficiency, standards compliance, design)
+    - Conditional agents auto-selected based on detected changes (PHP, Swift, error handling, types, tests, comments)
+    - 3-pass fix-and-re-review cycle with scoped re-reviews
+    - Cross-session review history tracked per branch in `.claude/review-history.json`
+    - Loop mode (`/mella:review loop`) for fully autonomous batch/overnight runs
+    - Reference prompts for iOS, efficiency, standards, and quality reviewers
+
 ## [1.1.2] - 2026-02-25
 
 ### Changed

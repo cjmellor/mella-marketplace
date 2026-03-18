@@ -43,6 +43,24 @@ This will:
 2. Push all commits to the remote
 3. Check if a PR exists or ask to create one
 
+### `/mella:review`
+
+Multi-agent code review with automatic fix-and-re-review cycles.
+
+**Usage:**
+```bash
+/mella:review                # Interactive review of current branch vs main
+/mella:review loop           # Auto-fix mode for batch/overnight runs
+/mella:review --force        # Review latest commit on main/master
+```
+
+**Features:**
+- **Multi-agent**: Runs 5+ specialized review agents in parallel (code quality, bugs, efficiency, standards compliance, design)
+- **Conditional agents**: Automatically adds PHP, Swift, error handling, type design, test, and comment reviewers based on detected changes
+- **3-pass cycle**: Applies fixes, then re-reviews changed files, up to 3 passes
+- **Cross-session history**: Tracks previous findings per branch in `.claude/review-history.json`
+- **Loop mode**: Fully autonomous fix cycle for use with the `review-loop` script
+
 ### `/mella:walkthrough`
 
 Interactive walkthrough command for documentation and QA.
