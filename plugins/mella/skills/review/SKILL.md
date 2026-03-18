@@ -1,6 +1,7 @@
 ---
 name: review
 description: Use when reviewing code, checking code quality, or before committing/creating a PR. Runs when the user says things like "review my code", "check my changes", "review what I've done", "can you look over this", "run a code review", or "check for issues". Analyzes all branch changes against main, selects the appropriate review agents, and presents a consolidated report with optional fixes. Supports loop mode for iterative auto-fixing.
+context: fork
 ---
 
 # /review Skill
