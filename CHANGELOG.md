@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-03-21
+
+### Added
+
+- **mella plugin** (v2.1.0)
+  - `review` skill — Stack-agnostic architecture with per-stack reference files
+    - `--stack <stack,...>` argument to explicitly specify project stacks (e.g. `--stack laravel`, `--stack laravel,ios`)
+    - Auto-detection of project stacks from project files (`artisan`/`composer.json` for Laravel, `.swift` files for iOS)
+    - New `references/laravel.md` — consolidated Laravel/PHP reviewer covering efficiency, quality, security, and migration safety
+    - Renamed `references/ios-reviewer.md` → `references/ios.md` for consistency
+    - `/simplify` integration — runs as a final polish step (Step 11) after the review cycle for code reuse, quality, and efficiency checks
+
+### Removed
+
+- **mella plugin** (v2.1.0)
+  - `references/reuse-quality-reviewer.md` — replaced by `/simplify` (built-in Claude Code skill)
+  - `references/efficiency-reviewer.md` — replaced by `/simplify` (built-in Claude Code skill)
+  - React/TypeScript-specific review content (can be re-added as a stack reference file later)
+
+### Changed
+
+- **mella plugin** (v2.1.0)
+  - `references/standards-reviewer.md` — genericised examples and expanded config file detection to be language-agnostic
+  - Review cycle now runs 3 always-on agents (down from 5) plus stack-specific and conditional agents
+  - Dedup rules in Step 7 updated to reflect new agent composition
+
 ## [2.0.1] - 2026-03-18
 
 ### Changed

@@ -49,17 +49,30 @@ Multi-agent code review with automatic fix-and-re-review cycles.
 
 **Usage:**
 ```bash
-/mella:review                # Interactive review of current branch vs main
-/mella:review loop           # Auto-fix mode for batch/overnight runs
-/mella:review --force        # Review latest commit on main/master
+/mella:review                       # Interactive review of current branch vs main
+/mella:review --stack laravel       # Explicitly specify project stack
+/mella:review --stack laravel,ios   # Multiple stacks
+/mella:review loop                  # Auto-fix mode for batch/overnight runs
+/mella:review --force               # Review latest commit on main/master
 ```
 
 **Features:**
-- **Multi-agent**: Runs 5+ specialized review agents in parallel (code quality, bugs, efficiency, standards compliance, design)
-- **Conditional agents**: Automatically adds PHP, Swift, error handling, type design, test, and comment reviewers based on detected changes
+- **Stack-agnostic**: Works with any codebase. Auto-detects project stacks (Laravel, iOS) from project files, or specify explicitly with `--stack`
+- **Multi-agent**: Runs review agents in parallel (code quality, bugs, standards compliance, plus stack-specific reviewers)
+- **Stack-specific reviewers**: Deep framework knowledge loaded conditionally — Laravel/PHP patterns (N+1, migration safety, Eloquent antipatterns) and iOS/Swift patterns (concurrency, memory, SwiftUI)
+- **`/simplify` integration**: Runs Claude Code's built-in `/simplify` as a final polish pass for code reuse, quality, and efficiency
+- **Conditional agents**: Automatically adds error handling, type design, test, and comment reviewers based on detected changes
 - **3-pass cycle**: Applies fixes, then re-reviews changed files, up to 3 passes
 - **Cross-session history**: Tracks previous findings per branch in `.claude/review-history.json`
 - **Loop mode**: Fully autonomous fix cycle for use with the `review-loop` script
+
+**Supported stacks:**
+| Stack | Detection | Reference file |
+|-------|-----------|---------------|
+| `laravel` | `artisan` file or `composer.json` with `laravel/framework` | `references/laravel.md` |
+| `ios` | `.swift` files in diff | `references/ios.md` |
+
+To add a new stack, create a `references/<stack>.md` file and add detection logic to Step 4 in `SKILL.md`.
 
 ### `/mella:walkthrough`
 

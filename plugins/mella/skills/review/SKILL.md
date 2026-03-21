@@ -1,6 +1,7 @@
 ---
 name: review
 description: Use when reviewing code, checking code quality, or before committing/creating a PR. Runs when the user says things like "review my code", "check my changes", "review what I've done", "can you look over this", "run a code review", or "check for issues". Analyzes all branch changes against main, selects the appropriate review agents, and presents a consolidated report with optional fixes. Supports loop mode for iterative auto-fixing.
+argument-hint: "[loop] [--force] [--stack <stack,...>]"
 context: fork
 ---
 
@@ -28,6 +29,8 @@ Run `git branch --show-current` to get the current branch name.
 - If on `main` or `master` **and** the user did NOT pass `--force` (or `-f`): warn the user: "You're on main — nothing to review." and stop.
 - If on `main` or `master` **with** `--force`/`-f`: continue, but use `HEAD~1` instead of `main` as the diff base in Step 3 (since you can't diff main against itself).
 - Otherwise, continue and store the branch name for later use.
+
+Also parse `--stack` if provided (e.g. `--stack laravel` or `--stack laravel,ios`). Split the value by comma to get an explicit stack list. If provided, this overrides auto-detection in Step 4.
 
 ## Step 2 — Load review history
 
@@ -107,13 +110,21 @@ If all fixed files are tracked and the filtered diff is empty, the cycle is done
 
 Scan the combined diff to detect the presence of:
 
-- **PHP files**: files with `.php` extension
-- **Non-PHP files**: any changed files that are not `.php` (e.g. `.ts`, `.js`, `.go`, `.py`, etc.)
 - **Error handling patterns**: try/catch, catch blocks, `.catch()`, fallback logic, empty catch, error suppression
 - **New type/interface definitions**: class, interface, type, enum declarations that are newly added
 - **Test files**: files matching common test patterns (e.g. `*Test.php`, `*_test.go`, `*.test.ts`, `*.spec.ts`, `tests/`, `test/`)
 - **Comments added or modified**: any new or changed comments, docstrings, PHPDoc, JSDoc, or inline comments
-- **Swift files**: files with `.swift` extension
+
+### Stack detection
+
+If `--stack` was provided in Step 1, use those stacks directly and skip auto-detection.
+
+Otherwise, auto-detect the project's stack(s):
+
+- **`laravel`**: Check for an `artisan` file in the repo root OR read `composer.json` and look for `laravel/framework` in `require` or `require-dev`. If found **and** `.php` files are in the diff, add `laravel` to the detected stacks.
+- **`ios`**: If `.swift` files are in the diff, add `ios` to the detected stacks.
+
+Store the detected stacks for use in Step 5. A project can have multiple stacks (e.g. a Laravel backend + Swift iOS app in the same repo).
 
 ## Step 5 — Select agents automatically
 
@@ -124,29 +135,30 @@ Based on the classification, build a list of agents to run. Do NOT ask the user 
 |---|---|
 | `pr-review-toolkit:code-reviewer` | General code quality, style, best practices |
 | `feature-dev:code-reviewer` | Bugs, logic errors, security vulnerabilities |
-| `general-purpose` agent with quality/design prompt | Dead code, code reuse, framework antipatterns, structural design issues |
-| `general-purpose` agent with efficiency/resilience prompt | N+1 queries, security risks, migration safety, resource leaks, performance |
 | `general-purpose` agent with standards compliance prompt | CLAUDE.md/MEMORY.md compliance, convention drift, tooling conflicts |
+
+**Stack-specific (only if stack detected or specified via `--stack`):**
+| Agent | Condition |
+|---|---|
+| `general-purpose` agent with stack reference prompt | For each detected stack, load its reference file and run as a separate agent |
+| `laravel-simplifier:laravel-simplifier` | `laravel` in detected stacks |
 
 **Conditionally include (only if detected):**
 | Agent | Condition |
 |---|---|
-| `laravel-simplifier:laravel-simplifier` | PHP files changed |
-| `pr-review-toolkit:code-simplifier` | Non-PHP files changed |
 | `pr-review-toolkit:silent-failure-hunter` | Error handling patterns detected |
 | `pr-review-toolkit:type-design-analyzer` | New type/interface definitions detected |
 | `pr-review-toolkit:pr-test-analyzer` | Test files changed or added |
 | `pr-review-toolkit:comment-analyzer` | Any comments or docstrings added/modified |
-| `general-purpose` agent with iOS reviewer prompt | Swift files changed |
 
 ### Locating reference files
 
 Before running agents, locate this skill's reference files. Use Glob with pattern `**/skills/review/references/*.md` to find the `references/` directory. Read the following files from it:
 
-- **Every review**: `reuse-quality-reviewer.md`, `efficiency-reviewer.md`, `standards-reviewer.md` — use their full contents as prompts for three separate `general-purpose` Task agents. Pass each agent the list of all changed files and their diffs.
-- **When Swift files detected**: `ios-reviewer.md` — use its full contents as the prompt for a `general-purpose` Task agent. Pass the agent the list of changed Swift files and their diffs.
+- **Every review**: `standards-reviewer.md` — use its full contents as the prompt for a `general-purpose` Task agent. Pass the agent the list of all changed files and their diffs. (Code reuse, quality, and efficiency checks are handled by `/simplify` in Step 11.)
+- **Per detected stack**: For each stack in the detected stacks list (e.g. `laravel`, `ios`), read `<stack>.md` from the references directory and use its full contents as the prompt for a `general-purpose` Task agent. Pass the agent the list of changed files and their diffs.
 
-Present a brief summary of which agents will run and why (e.g. "Running 5 agents: code-reviewer, silent-failure-hunter (detected try/catch in `src/Api/Client.php`), ..."). Then immediately continue to Step 6.
+Present a brief summary of which agents will run and why (e.g. "Running 7 agents: code-reviewer, laravel stack reviewer (detected Laravel project), laravel-simplifier, ..."). Then immediately continue to Step 6.
 
 ## Step 6 — Run selected agents in parallel
 
@@ -164,13 +176,11 @@ Before presenting findings, review all agent outputs together to ensure coherenc
 3. **Check CLAUDE.md alignment**: Remove or deprioritize findings that conflict with explicit CLAUDE.md guidance.
 4. **Prioritize by confidence**: If multiple agents flag the same issue, it's higher confidence.
 5. **Cross-agent overlap resolution** (when multiple agents flag the same lines, keep the most specific finding):
-   - **Simplifier vs. quality-reviewer**: Keep the quality-reviewer's finding (more specific root cause). If simplifier says "simplify" and quality-reviewer says "reuse existing utility" — merge into one finding with the reuse suggestion.
-   - **Code-reviewer vs. efficiency-reviewer**: If both flag a performance issue, keep the efficiency-reviewer's finding (deeper analysis, framework-specific fix).
-   - **Code-reviewer vs. quality-reviewer on dead code**: Keep the quality-reviewer's finding (it verifies via codebase search).
-   - **Code-reviewer vs. efficiency-reviewer on security**: Keep the efficiency-reviewer's finding (more specific exploit scenario and remediation).
-   - **Quality-reviewer `framework-antipattern` vs. simplifier**: Keep the quality-reviewer's finding (cites the specific framework best practice).
    - **Standards-reviewer vs. any other agent**: If the standards-reviewer cites a specific CLAUDE.md rule and another agent flags the same lines for a different reason — keep both (the standards violation is an independent finding backed by documented authority). If they say the same thing, merge and cite the rule.
    - **Standards-reviewer `tooling-conflict` vs. simplifier**: Keep the standards-reviewer's finding (it cites the specific tool configuration).
+   - **Stack reviewer vs. code-reviewer on same lines**: Keep the stack reviewer's finding (more specific framework context and fix suggestion).
+   - **Stack reviewer vs. simplifier**: Keep the stack reviewer's finding if it identifies a specific root cause; keep the simplifier's if it provides a concrete code rewrite that the stack reviewer does not.
+   - **Stack reviewer vs. standards-reviewer**: Keep both if the standards-reviewer cites a specific CLAUDE.md rule (same logic as the general standards-reviewer rule above).
 
 ### 7b. Cross-session comparison (if history exists)
 
@@ -301,6 +311,14 @@ Only save findings from the current review session. Previous history is replaced
 
 Create the `.claude/` directory if it doesn't exist. Ensure `.claude/review-history.json` is in `.gitignore` if the user doesn't want it committed (ask on first save if `.gitignore` exists but doesn't include it).
 
+## Step 11 — Run /simplify
+
+After the review cycle is complete and history is saved, run the built-in `/simplify` skill as a final polish pass. This covers code reuse, quality, and efficiency checks that the review cycle's remaining agents do not.
+
+Use the Skill tool to invoke `simplify`. It will review the changed code and fix any reuse, quality, or efficiency issues it finds.
+
+Skip this step if the user said "done"/"stop" during Step 9 — they want to exit, not run more checks.
+
 ---
 
 # Loop Mode
@@ -339,6 +357,10 @@ If a fix fails 3 times on the same issue, create `.review-stuck` with the issue 
 ### L3. Save history
 
 Save review history as normal (Step 10), marking fixed items as `applied`.
+
+### L3b. Run /simplify
+
+Use the Skill tool to invoke `simplify`. It will review and fix reuse, quality, and efficiency issues. Any files it modifies should be added to the `fixed_files` list for the next iteration's scoped re-review.
 
 ### L4. Signal continuation
 
