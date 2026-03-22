@@ -6,14 +6,14 @@
   },
   "metadata": {
     "description": "Mella's curated marketplace of Claude Code plugins",
-    "version": "2.1.0"
+    "version": "2.2.0"
   },
   "plugins": [
     {
       "name": "mella",
       "source": "./plugins/mella",
       "description": "Mella's collection of productivity tools for Claude Code",
-      "version": "2.1.0",
+      "version": "2.2.0",
       "keywords": ["testing", "walkthrough", "documentation", "qa", "code-review", "review"],
       "license": "MIT"
     }
