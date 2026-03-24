@@ -199,8 +199,6 @@ Reviewed **N** comments from @botname.
 
 - [Link](url) — `src/Old.php:10` — File no longer exists
 
----
-*Triaged by `/mella:review-bot`*
 ```
 
 **Omit any section that has zero items.** If nothing was dismissed, omit the "Dismissed" section entirely. Same for "Applied fixes", "Skipped", etc.
