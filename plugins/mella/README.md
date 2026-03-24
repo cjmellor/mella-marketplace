@@ -74,6 +74,28 @@ Multi-agent code review with automatic fix-and-re-review cycles.
 
 To add a new stack, create a `references/<stack>.md` file and add detection logic to Step 4 in `SKILL.md`.
 
+### `/mella:review-bot`
+
+Triage review bot comments on a GitHub PR — re-review, fix, dismiss, and summarise.
+
+**Usage:**
+```bash
+/mella:review-bot                  # Auto-detect PR from current branch
+/mella:review-bot 123              # Target a specific PR by number
+/mella:review-bot --bot coderabbit # Target a specific bot by username
+/mella:review-bot 123 --bot copilot # Both: specific PR and bot
+```
+
+**Features:**
+- **Auto-detection**: Finds the PR from the current branch and identifies bot comments by `user.type`
+- **`--bot` override**: Target a specific bot username (useful for bots that use personal access tokens)
+- **Validity assessment**: Re-reviews each bot comment against the actual code — checks if the issue is real, already handled, or project-specific
+- **Smart fixes**: Applies the bot's suggestion when correct, or a better fix when the suggestion is suboptimal (`fix-alt`)
+- **Confidence gating**: Only auto-fixes at high/medium confidence; low-confidence items are flagged for manual review
+- **Thread grouping**: Collapses bot reply threads into a single finding
+- **PR summary comment**: Posts a structured markdown comment on the PR with disposition for every bot comment (applied, dismissed with reason, outdated)
+- **No auto-commit**: Applies fixes to the working tree only — commit when you're ready with `/mella:commit`
+
 ### `/mella:walkthrough`
 
 Interactive walkthrough command for documentation and QA.

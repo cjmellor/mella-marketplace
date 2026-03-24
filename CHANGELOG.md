@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-03-24
+
+### Added
+
+- **mella plugin** (v1.4.0)
+  - `review-bot` skill — Triage review bot comments on GitHub PRs via `/mella:review-bot`
+    - Auto-detects PR from current branch or accepts a PR number as argument
+    - Identifies bot comments by `user.type == "Bot"`, with `--bot <name>` override for PAT-based bots
+    - Re-reviews each comment against actual code: validity assessment with confidence scoring
+    - Classifies as `fix`, `fix-alt` (better fix than bot's suggestion), `dismiss`, `outdated`, or `flag` (needs manual review)
+    - Groups threaded bot conversations into single findings
+    - Posts structured summary comment on the PR with dispositions and reasoning
+
 ## [1.3.0] - 2026-03-22
 
 ### Added
