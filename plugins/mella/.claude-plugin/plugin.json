@@ -1,6 +1,6 @@
 {
   "name": "mella",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Mella's collection of productivity tools for Claude Code",
   "author": {
     "name": "Chris"
@@ -14,6 +14,17 @@
         "hooks": [
           {
             "type": "command",
+            "if": "Bash(*sql*)",
+            "command": "I=$(cat); C=$(printf '%s' \"$I\" | jq -r '.tool_input.command // empty'); [ -z \"$C\" ] && exit 0; printf '%s' \"$C\" | grep -qiE '^(mysql|sqlite3)|php artisan (tinker|db([^:a-z]|$))|herd php artisan (tinker|db([^:a-z]|$))|sail (mysql|tinker|artisan tinker|artisan db)' || exit 0; (printf '%s' \"$C\" | grep -qiE 'DROP (TABLE|DATABASE|INDEX|VIEW|USER|COLUMN|IF)|DELETE FROM|TRUNCATE|UPDATE [^ ]+ SET|INSERT INTO|REPLACE INTO|ALTER TABLE|RENAME TABLE|GRANT |REVOKE |LOAD DATA|SET GLOBAL|FLUSH PRIVILEGES|SOURCE ' || printf '%s' \"$C\" | grep -qE '->save\\(|->create\\(|::create\\(|->update\\(|->delete\\(|->forceDelete\\(|::destroy\\(|->truncate\\(|->insert\\(|->upsert\\(|->updateOrCreate\\(|->firstOrCreate\\(|->forceCreate\\(|->push\\(|->increment\\(|->decrement\\(|DB::statement|DB::unprepared|DB::insert|DB::update|DB::delete|Schema::drop|Schema::dropIfExists|Schema::rename|Cache::flush|Storage::delete|Artisan::call' || printf '%s' \"$C\" | grep -qE '< *[^ ]+\\.sql') && echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"ask\",\"permissionDecisionReason\":\"Database write operation detected\"}}'"
+          },
+          {
+            "type": "command",
+            "if": "Bash(*tinker*)",
+            "command": "I=$(cat); C=$(printf '%s' \"$I\" | jq -r '.tool_input.command // empty'); [ -z \"$C\" ] && exit 0; printf '%s' \"$C\" | grep -qiE '^(mysql|sqlite3)|php artisan (tinker|db([^:a-z]|$))|herd php artisan (tinker|db([^:a-z]|$))|sail (mysql|tinker|artisan tinker|artisan db)' || exit 0; (printf '%s' \"$C\" | grep -qiE 'DROP (TABLE|DATABASE|INDEX|VIEW|USER|COLUMN|IF)|DELETE FROM|TRUNCATE|UPDATE [^ ]+ SET|INSERT INTO|REPLACE INTO|ALTER TABLE|RENAME TABLE|GRANT |REVOKE |LOAD DATA|SET GLOBAL|FLUSH PRIVILEGES|SOURCE ' || printf '%s' \"$C\" | grep -qE '->save\\(|->create\\(|::create\\(|->update\\(|->delete\\(|->forceDelete\\(|::destroy\\(|->truncate\\(|->insert\\(|->upsert\\(|->updateOrCreate\\(|->firstOrCreate\\(|->forceCreate\\(|->push\\(|->increment\\(|->decrement\\(|DB::statement|DB::unprepared|DB::insert|DB::update|DB::delete|Schema::drop|Schema::dropIfExists|Schema::rename|Cache::flush|Storage::delete|Artisan::call' || printf '%s' \"$C\" | grep -qE '< *[^ ]+\\.sql') && echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"ask\",\"permissionDecisionReason\":\"Database write operation detected\"}}'"
+          },
+          {
+            "type": "command",
+            "if": "Bash(*artisan db*)",
             "command": "I=$(cat); C=$(printf '%s' \"$I\" | jq -r '.tool_input.command // empty'); [ -z \"$C\" ] && exit 0; printf '%s' \"$C\" | grep -qiE '^(mysql|sqlite3)|php artisan (tinker|db([^:a-z]|$))|herd php artisan (tinker|db([^:a-z]|$))|sail (mysql|tinker|artisan tinker|artisan db)' || exit 0; (printf '%s' \"$C\" | grep -qiE 'DROP (TABLE|DATABASE|INDEX|VIEW|USER|COLUMN|IF)|DELETE FROM|TRUNCATE|UPDATE [^ ]+ SET|INSERT INTO|REPLACE INTO|ALTER TABLE|RENAME TABLE|GRANT |REVOKE |LOAD DATA|SET GLOBAL|FLUSH PRIVILEGES|SOURCE ' || printf '%s' \"$C\" | grep -qE '->save\\(|->create\\(|::create\\(|->update\\(|->delete\\(|->forceDelete\\(|::destroy\\(|->truncate\\(|->insert\\(|->upsert\\(|->updateOrCreate\\(|->firstOrCreate\\(|->forceCreate\\(|->push\\(|->increment\\(|->decrement\\(|DB::statement|DB::unprepared|DB::insert|DB::update|DB::delete|Schema::drop|Schema::dropIfExists|Schema::rename|Cache::flush|Storage::delete|Artisan::call' || printf '%s' \"$C\" | grep -qE '< *[^ ]+\\.sql') && echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"ask\",\"permissionDecisionReason\":\"Database write operation detected\"}}'"
           }
         ]

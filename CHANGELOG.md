@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Three `if` patterns (`Bash(*sql*)`, `Bash(*tinker*)`, `Bash(*artisan db*)`) gate process spawning to only database CLI commands
     - Eliminates ~98% of unnecessary process spawns (previously fired on every Bash call)
     - Original script logic retained as defense-in-depth for false positive filtering
+
 ## [1.4.0] - 2026-03-24
 
 ### Added
