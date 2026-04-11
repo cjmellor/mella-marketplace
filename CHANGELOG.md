@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-04-11
+
+### Added
+
+- **mella plugin** (v1.6.0)
+  - `implement` skill — TDD-driven implementation that reads GStack plan artifacts and drives Red→Green test loops via `/mella:implement`
+    - Orients from GStack planning artifacts: design docs, eng review test plans, CEO plans, design mockups
+    - Detects stack (Swift, PHP/Laravel, Node, Rust, Go, Python) and infers test runner
+    - Builds ordered test queue from Critical Paths → Key Interactions → Edge Cases
+    - Enforces strict Red→Green loop: one test at a time, minimal code to pass, no anticipation
+    - Guards against scope creep by checking design constraints and premises
+    - Stack-agnostic test generation (vitest, pest, xcodebuild, cargo test patterns)
+
+## [1.5.0] - 2026-03-30
+
+### Changed
+
+- **mella plugin** (v1.5.0)
+  - Database Write Guard hook now uses `if` field for conditional hook filtering
+    - Three `if` patterns (`Bash(*sql*)`, `Bash(*tinker*)`, `Bash(*artisan db*)`) gate process spawning to only database CLI commands
+    - Eliminates ~98% of unnecessary process spawns (previously fired on every Bash call)
+    - Original script logic retained as defense-in-depth for false positive filtering
 ## [1.4.0] - 2026-03-24
 
 ### Added
