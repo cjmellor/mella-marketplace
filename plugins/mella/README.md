@@ -96,6 +96,29 @@ Triage review bot comments on a GitHub PR — re-review, fix, dismiss, and summa
 - **PR summary comment**: Posts a structured markdown comment on the PR with disposition for every bot comment (applied, dismissed with reason, outdated)
 - **No auto-commit**: Applies fixes to the working tree only — commit when you're ready with `/mella:commit`
 
+### `/mella:implement`
+
+TDD-driven implementation with a strict Red→Green loop. Works standalone on any project, or picks up where GStack planning left off.
+
+**Usage:**
+```bash
+/mella:implement                   # Start a TDD-driven implementation
+# Or say: "start building", "let's build this", "ready to implement"
+```
+
+**Features:**
+- **Auto-detects planning artifacts**: Step 1 checks for GStack planning files (eng review test plan, design doc, CEO plan, design mockups). If present, reads them as the source of truth. If absent, switches to **standalone mode** and elicits Critical Paths / Key Interactions / Edge Cases directly.
+- **Stack-agnostic**: Detects Swift, PHP/Laravel, Node (Vitest/Jest), Rust, Go, Python — infers the test runner and single-test command from project files.
+- **Ordered test queue**: Tracer bullets first (end-to-end), then Key Interactions (incremental behaviors), then Edge Cases — so early tests prove the critical path, not the error paths.
+- **Iron Law**: No production code without a failing test first. Code written before a test must be deleted, not "adapted."
+- **Mandatory Verify RED**: Each test must fail for the right reason (missing behavior) before implementation — not typos, not setup errors. Forces the epistemic check that watching the failure is how you know the test actually tests something.
+- **Mandatory Verify GREEN**: Target test passes, **full suite still passes**, output is pristine (no warnings, no stderr noise). Prevents silent regressions in files you didn't touch.
+- **Rationalizations table**: Eight common TDD-skip excuses ("too simple to test," "I'll test after," "already manually tested") with rebuttals, placed inside the loop where the temptation hits.
+- **When Stuck table**: Escape hatches for the four failure modes that typically cause mid-loop abandonment — wish-for-API drafting, simplifying over-complex interfaces, dependency injection at coupling seams, helper extraction.
+- **Bug-fix discipline**: Off-plan bugs get a failing repro test before the fix — no "tiny one-line" exceptions.
+- **Verification Checklist**: 9-box gate before declaring done — every behavior tested, every RED watched, full suite green, no untested production code.
+- **Scope guardrails**: Binds to whichever source Step 1 produced (design doc Premises in GStack mode, user-stated constraints in standalone mode). Flags and stops on constraint conflicts rather than silently reshaping scope.
+
 ### `/mella:walkthrough`
 
 Interactive walkthrough command for documentation and QA.

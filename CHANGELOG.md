@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.1] - 2026-04-14
+
+### Changed
+
+- **mella plugin** (v1.6.1) — `implement` skill hardening and stack-agnostic restructure
+  - **Standalone mode**: Step 1 now auto-detects GStack planning artifacts. If present, reads them as before; if absent, elicits Critical Paths / Key Interactions / Edge Cases directly from the user. The skill is no longer gated on GStack usage.
+  - **Iron Law** block added to Step 4: "No production code without a failing test first." Code written before a test must be deleted, not "adapted."
+  - **Verify RED made mandatory** with three explicit gates (fails, not errors; expected failure message; missing behavior, not broken test) plus the epistemic justification for why watching the failure is non-negotiable.
+  - **Verify GREEN made mandatory** with three gates (target test passes, full suite passes, output is pristine). Prevents local-file-only verification from hiding regressions.
+  - **Rationalizations table** — 8 common excuses for skipping TDD with their rebuttals (including "hard to test = hard to use" as a design signal).
+  - **When Stuck table** — four common TDD failure modes with escape hatches (wish-for-API drafting, dependency injection at seams, helper extraction).
+  - **Step 6 (Bug Fixes)** — explicit TDD discipline for off-plan bug fixes: failing test first, even for one-line fixes.
+  - **Step 7 (Verification Checklist)** — 9-box gate before declaring an implementation complete.
+  - **Scope & Design Guardrails** section now binds to whichever source Step 1 produced (design doc Premises in GStack mode, user-stated constraints in standalone mode).
+
+### Fixed
+
+- **mella plugin** — `VERSION` and `.claude-plugin/marketplace.json` were stale across previous releases (both still read `1.4.0` / `1.6.0.0` after v1.5.0 and v1.6.0). Normalised `VERSION` to 3-part semver (`1.6.1`) and synced `marketplace.json` so the manifest and tag agree.
+
+### Documentation
+
+- **README** — Skills table now lists all five skills (`review`, `commit`, `walkthrough`, `review-bot`, `implement`) with up-to-date descriptions and triggers. "Start using" section extended with `/mella:review-bot` and `/mella:implement` examples.
+
 ## [1.6.0] - 2026-04-11
 
 ### Added
