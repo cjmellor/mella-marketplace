@@ -1,401 +1,185 @@
 ---
 name: review
-description: Use when reviewing code, checking code quality, or before committing/creating a PR. Runs when the user says things like "review my code", "check my changes", "review what I've done", "can you look over this", "run a code review", or "check for issues". Analyzes all branch changes against main, selects the appropriate review agents, and presents a consolidated report with optional fixes. Supports loop mode for iterative auto-fixing.
-argument-hint: "[loop] [--force] [--stack <stack,...>]"
+description: Orchestrated pre-PR code review. Invokes review skills based on what changed — structural issues, Laravel patterns, visual polish, DX, code quality. Use when reviewing code, checking changes, or before committing/creating a PR.
+when_to_use: "review my code, check my changes, pre-PR review, before committing, before creating a PR, check for issues, run a code review, look over my diff"
+argument-hint: "[--force]"
 context: fork
+disable-model-invocation: true
+effort: high
+allowed-tools: Bash Read Edit Write Grep Glob Skill
 ---
 
 # /review Skill
 
-This skill has two modes:
-
-- **`/review`** — Interactive mode. Run agents, present findings, apply fixes, and automatically re-review until clean (up to 3 passes).
-- **`/review loop`** — Loop mode. Auto-fix issues iteratively until clean or stuck. Used by the `review-loop` script for overnight/batch runs.
-
-When the user runs `/review`, follow these steps exactly. For loop mode differences, see the "Loop Mode" section at the end.
+Single-pass orchestrated code review. Analyzes branch changes, selects appropriate review skills based on what changed, consolidates findings, and lets you choose which fixes to apply.
 
 ## Step 0 — Plan mode guard
 
 **If you are currently in plan mode, stop immediately.** Tell the user:
 
-> "/review requires Edit and Write access to apply fixes and re-review. You're in plan mode, which blocks those tools. Please exit plan mode first, then re-run `/review`."
+> "/review requires Edit and Write access to apply fixes. You're in plan mode, which blocks those tools. Please exit plan mode first, then re-run `/review`."
 
-Do not proceed to Step 1. The fix→re-review loop (Steps 3–9) cannot work without write access.
+Do not proceed to Step 1.
 
 ## Step 1 — Check branch
 
 Run `git branch --show-current` to get the current branch name.
 
-- If on `main` or `master` **and** the user did NOT pass `--force` (or `-f`): warn the user: "You're on main — nothing to review." and stop.
-- If on `main` or `master` **with** `--force`/`-f`: continue, but use `HEAD~1` instead of `main` as the diff base in Step 3 (since you can't diff main against itself).
-- Otherwise, continue and store the branch name for later use.
+- If on `main` or `master` **and** the user did NOT pass `--force`: warn the user: "You're on main — nothing to review." and stop.
+- If on `main` or `master` **with** `--force`: continue, but use `HEAD~1` instead of `main` as the diff base.
+- Otherwise, continue.
 
-Also parse `--stack` if provided (e.g. `--stack laravel` or `--stack laravel,ios`). Split the value by comma to get an explicit stack list. If provided, this overrides auto-detection in Step 4.
+## Step 2 — Gather diff
 
-## Step 2 — Load review history
+Get all changes compared to the base:
 
-Check if `.claude/review-history.json` exists in the repo root. If it does, read it and check if the `branch` field matches the current branch.
-
-- If the branch matches: load the previous findings into memory for comparison in Step 7. If a `pass` field is present and the `head_commit` matches the current HEAD, this is a mid-cycle recovery (context compaction occurred) — resume the cycle at pass `pass + 1` using `fixed_files` to scope the next diff.
-- If the branch differs or file doesn't exist: no previous history for this branch. Start at pass 1.
-
-The history file structure is:
-
-```json
-{
-  "branch": "feature/example",
-  "reviewed_at": "2026-02-05T10:30:00Z",
-  "head_commit": "a1b2c3d",
-  "pass": 1,
-  "fixed_files": ["src/Example.php", "src/Controller.php"],
-  "findings": [
-    {
-      "id": "f1",
-      "file": "src/Example.php",
-      "lines": "45-52",
-      "agents": ["laravel-simplifier"],
-      "action": "remove",
-      "summary": "Remove unused variable",
-      "status": "pending"
-    }
-  ]
-}
-```
-
-Status values: `pending` (not yet addressed), `applied` (fix was applied), `dismissed` (user chose to ignore).
-
-## Review cycle (Steps 3–9)
-
-Steps 3 through 9 form a review cycle that runs up to **3 passes**. Track the current pass number starting at 1. After fixes are applied in Step 9, loop back to Step 3 for another pass. The cycle exits early when no new findings are found or the user says "done" / "stop".
-
-**Every pass must execute Steps 3 through 8 fully — no shortcuts.** Do not skip agent execution because the diff "looks clean" to you. The agents exist precisely because a single review (including yours) misses things. If Step 3 produces a non-empty diff, you must classify (Step 4), select agents (Step 5), run them (Step 6), consolidate (Step 7), and present findings (Step 8). The only valid short-circuit is if the scoped diff in Step 3 is completely empty.
-
-### Context management
-
-To keep context usage under control across passes:
-
-- **Pass 1**: Full branch diff — review everything.
-- **Pass 2+**: Scoped re-review — only diff and re-review files that were modified by fixes in the previous pass. Do not re-ingest the entire branch diff.
-- **State persistence**: Save review history to disk after each pass (not just at the end). If context compaction occurs mid-cycle, re-read `.claude/review-history.json` at the start of the next pass to recover the pass number and which findings have already been addressed.
-
-## Step 3 — Gather the diff
-
-### Pass 1 (full branch diff)
-
-Run the following to get all changes (committed and uncommitted) compared to the base:
-
-```
+```bash
 git diff main...HEAD    # or git diff HEAD~1...HEAD if --force on main/master
 git diff
 git diff --cached
 git rev-parse HEAD
 ```
 
-Use `main` as the diff base normally. If `--force` was used on `main`/`master`, use `HEAD~1` instead (review the latest commit).
+Combine these into the full set of changed files and their diffs. If there are no changes at all, tell the user and stop.
 
-Combine these into the full set of changed files and their diffs. Store the HEAD commit hash. If there are no changes at all, tell the user and stop.
+## Step 3 — Classify changes
 
-### Pass 2+ (scoped re-review)
+Scan the combined diff and changed file paths to detect:
 
-Only review files that were modified by fixes in the previous pass — do NOT re-diff the entire branch. This keeps context lean and focused on what actually changed.
+- **Laravel project**: Check for `artisan` file in repo root OR `laravel/framework` in `composer.json`
+- **Error handling patterns**: try/catch, catch blocks, `.catch()`, fallback logic, empty catch
+- **New type/interface definitions**: class, interface, type, enum declarations (newly added)
+- **Test files**: files matching `*Test.php`, `*_test.go`, `*.test.ts`, `*.spec.ts`, `tests/`, `test/`
+- **Comments added or modified**: any new or changed comments, docstrings, PHPDoc, JSDoc, inline comments
+- **Frontend files**: `.tsx`, `.jsx`, `.ts`, `.js`, `.css`, `.scss` in `src/`, `app/`, `components/`, `resources/`
+- **Config/tooling files**: `package.json`, `composer.json`, `Dockerfile`, `tsconfig.json`, `vite.config.ts`, `.env*`, `makefile`, `webpack.config.*`, CI/CD files (`.github/workflows/`, `Jenkinsfile`)
 
-For each file in the `fixed_files` list, check if it is tracked or untracked:
+Store all detected categories for use in Step 4.
 
-- **Tracked files**: Use `git diff` and `git diff --cached` filtered to those specific files.
-- **Untracked files**: `git diff` cannot see these. Instead, read the file contents directly (they are new files — the entire content is the "diff").
+## Step 4 — Select skills to invoke
 
-If all fixed files are tracked and the filtered diff is empty, the cycle is done — proceed to Step 10.
-
-## Step 4 — Classify the changes
-
-Scan the combined diff to detect the presence of:
-
-- **Error handling patterns**: try/catch, catch blocks, `.catch()`, fallback logic, empty catch, error suppression
-- **New type/interface definitions**: class, interface, type, enum declarations that are newly added
-- **Test files**: files matching common test patterns (e.g. `*Test.php`, `*_test.go`, `*.test.ts`, `*.spec.ts`, `tests/`, `test/`)
-- **Comments added or modified**: any new or changed comments, docstrings, PHPDoc, JSDoc, or inline comments
-
-### Stack detection
-
-If `--stack` was provided in Step 1, use those stacks directly and skip auto-detection.
-
-Otherwise, auto-detect the project's stack(s):
-
-- **`laravel`**: Check for an `artisan` file in the repo root OR read `composer.json` and look for `laravel/framework` in `require` or `require-dev`. If found **and** `.php` files are in the diff, add `laravel` to the detected stacks.
-- **`ios`**: If `.swift` files are in the diff, add `ios` to the detected stacks.
-
-Store the detected stacks for use in Step 5. A project can have multiple stacks (e.g. a Laravel backend + Swift iOS app in the same repo).
-
-## Step 5 — Select agents automatically
-
-Based on the classification, build a list of agents to run. Do NOT ask the user to confirm — simply tell them which agents will run and why, then proceed immediately to Step 6.
+Based on classification, build the list of skills to run. Do NOT ask the user — tell them which skills will run and why, then proceed immediately to Step 5.
 
 **Always include:**
-| Agent | Reason |
-|---|---|
-| `pr-review-toolkit:code-reviewer` | General code quality, style, best practices |
-| `feature-dev:code-reviewer` | Bugs, logic errors, security vulnerabilities |
-| `general-purpose` agent with standards compliance prompt | CLAUDE.md/MEMORY.md compliance, convention drift, tooling conflicts |
+| Skill | Reason |
+|-------|--------|
+| `/review` (gstack) | Structural issues: SQL safety, LLM trust boundaries, conditional side effects |
+| `/simplify` | Code reuse, quality, and efficiency — always runs last |
 
-**Stack-specific (only if stack detected or specified via `--stack`):**
-| Agent | Condition |
-|---|---|
-| `general-purpose` agent with stack reference prompt | For each detected stack, load its reference file and run as a separate agent |
-| `laravel-simplifier:laravel-simplifier` | `laravel` in detected stacks |
+**Conditionally include (Laravel project detected):**
+| Skill | Reason |
+|-------|--------|
+| `laravel-best-practices` | 125+ Laravel rules: N+1, caching, eloquent, security, architecture, migrations. Check if installed by looking for its SKILL.md. If not found, skip silently and proceed. |
+| `laravel-simplifier:laravel-simplifier` | Laravel-specific code clarity, PSR-12, Laravel conventions |
 
-**Conditionally include (only if detected):**
-| Agent | Condition |
-|---|---|
+**Conditionally include (based on diff content):**
+| Skill | Condition |
+|-------|-----------|
+| `/design-review` (gstack) | Frontend files detected |
+| `/devex-review` (gstack) | Config/tooling files detected |
 | `pr-review-toolkit:silent-failure-hunter` | Error handling patterns detected |
 | `pr-review-toolkit:type-design-analyzer` | New type/interface definitions detected |
 | `pr-review-toolkit:pr-test-analyzer` | Test files changed or added |
-| `pr-review-toolkit:comment-analyzer` | Any comments or docstrings added/modified |
+| `pr-review-toolkit:comment-analyzer` | Comments added or modified |
 
-### Locating reference files
+Present a brief summary before running: e.g. "Running 5 skills: gstack /review, laravel-best-practices, pr-review-toolkit:silent-failure-hunter, laravel-simplifier, /simplify."
 
-Before running agents, locate this skill's reference files. Use Glob with pattern `**/skills/review/references/*.md` to find the `references/` directory. Read the following files from it:
+## Step 5 — Invoke selected skills
 
-- **Every review**: `standards-reviewer.md` — use its full contents as the prompt for a `general-purpose` Task agent. Pass the agent the list of all changed files and their diffs. (Code reuse, quality, and efficiency checks are handled by `/simplify` in Step 11.)
-- **Per detected stack**: For each stack in the detected stacks list (e.g. `laravel`, `ios`), read `<stack>.md` from the references directory and use its full contents as the prompt for a `general-purpose` Task agent. Pass the agent the list of changed files and their diffs.
+Invoke skills using the Skill tool in this order:
 
-Present a brief summary of which agents will run and why (e.g. "Running 7 agents: code-reviewer, laravel stack reviewer (detected Laravel project), laravel-simplifier, ..."). Then immediately continue to Step 6.
+1. `/review` (gstack) — structural baseline first
+2. `laravel-best-practices` — if Laravel detected and installed
+3. `/design-review` (gstack) — if triggered
+4. `/devex-review` (gstack) — if triggered
+5. `pr-review-toolkit:silent-failure-hunter` — if triggered
+6. `pr-review-toolkit:type-design-analyzer` — if triggered
+7. `pr-review-toolkit:pr-test-analyzer` — if triggered
+8. `pr-review-toolkit:comment-analyzer` — if triggered
+9. `laravel-simplifier:laravel-simplifier` — if Laravel detected
+10. `/simplify` — always, last
 
-## Step 6 — Run selected agents in parallel
+Steps 3–8 that are all triggered can be invoked in parallel (single message, multiple Skill tool calls) to save time. Steps 1, 2, 9, and 10 run sequentially as they establish context or do final polish.
 
-Launch all confirmed agents using the Task tool in a single message so they run concurrently. Pass each agent the list of changed files and the relevant diff context so they know what to review.
+If any skill invocation fails or is not installed, skip it, note it in the final report, and continue with the remaining skills.
 
-## Step 7 — Consolidate and deduplicate
+## Step 6 — Consolidate findings
 
-Before presenting findings, review all agent outputs together to ensure coherence:
+Review all skill outputs together:
 
-### 7a. Within-session consolidation
+1. **Identify duplicates**: Multiple skills may flag the same issue. Keep the most detailed explanation and note which skills agreed (more agreement = higher confidence).
+2. **Identify contradictions**: One skill suggests adding code that another suggests removing. Label as "⚠️ Conflicting advice" and let the user decide.
+3. **Prioritize by confidence**: Multi-skill agreement elevates a finding's priority.
+4. **Normalize format**: Convert each skill's output into a consistent finding:
+   - ID (f1, f2, ...)
+   - File and line range
+   - Issue summary
+   - Suggested action (add / remove / change / flag)
+   - Which skills reported it
 
-1. **Identify duplicates**: Multiple agents may flag the same issue. Keep the most detailed explanation and note which agents agreed.
-2. **Identify contradictions**: One agent may suggest adding code that another suggests removing.
-   - For contradictions: present both perspectives clearly, label as "⚠️ Conflicting advice", and let the user decide.
-3. **Check CLAUDE.md alignment**: Remove or deprioritize findings that conflict with explicit CLAUDE.md guidance.
-4. **Prioritize by confidence**: If multiple agents flag the same issue, it's higher confidence.
-5. **Cross-agent overlap resolution** (when multiple agents flag the same lines, keep the most specific finding):
-   - **Standards-reviewer vs. any other agent**: If the standards-reviewer cites a specific CLAUDE.md rule and another agent flags the same lines for a different reason — keep both (the standards violation is an independent finding backed by documented authority). If they say the same thing, merge and cite the rule.
-   - **Standards-reviewer `tooling-conflict` vs. simplifier**: Keep the standards-reviewer's finding (it cites the specific tool configuration).
-   - **Stack reviewer vs. code-reviewer on same lines**: Keep the stack reviewer's finding (more specific framework context and fix suggestion).
-   - **Stack reviewer vs. simplifier**: Keep the stack reviewer's finding if it identifies a specific root cause; keep the simplifier's if it provides a concrete code rewrite that the stack reviewer does not.
-   - **Stack reviewer vs. standards-reviewer**: Keep both if the standards-reviewer cites a specific CLAUDE.md rule (same logic as the general standards-reviewer rule above).
+## Step 7 — Present report
 
-### 7b. Cross-session comparison (if history exists)
+Present a single consolidated report in this order:
 
-Compare current findings against previous review history:
-
-1. **Contradictions with applied fixes**: If a previous finding with status `applied` is now contradicted (e.g., "add X" was applied, now an agent says "remove X"):
-   - Flag as "⚠️ Contradicts previous review"
-   - Show what was done before and what's suggested now
-   - Require explicit user decision
-
-2. **Previously dismissed**: If a finding matches one with status `dismissed`, skip it — the user already said no.
-
-3. **Still pending**: If a finding from the previous review is still relevant (same file/lines, issue still exists), mark as "Still outstanding from previous review".
-
-4. **Resolved**: If a previous `pending` finding no longer applies (code was changed/removed), it will naturally not appear.
-
-Assign each new finding a unique ID (e.g., `f1`, `f2`, ...) and classify its action type:
-- `add` — suggesting new code be added
-- `remove` — suggesting code be deleted
-- `change` — suggesting code be modified
-- `flag` — pointing out an issue without specific fix
-
-## Step 8 — Present report
-
-Once consolidation is complete, present a single report. On pass 2+, prefix the report with "**Pass N**" so the user knows which iteration they're on. Present in this order:
-
-### Section 1: Contradictions with previous review (if any)
+### Section 1: Conflicts (if any)
 
 ```
-### ⚠️ Contradicts previous review
+### ⚠️ Conflicting advice
 
-| ID | File | Previously | Now | Decision needed |
-|----|------|-----------|-----|-----------------|
-| f3 | src/Api/Client.php:60-65 | Added null check (applied) | Remove null check | Which to keep? |
-```
-
-### Section 2: Outstanding from previous review (if any)
-
-```
-### Outstanding from previous review
-
-| ID | File | Issue | Status |
-|----|------|-------|--------|
-| f1 | src/Api/Client.php:45-52 | Remove unused $config | pending |
-```
-
-### Section 3: New findings
-
-```
-### New findings
-
-| ID | File | Issue | Agents | Action |
-|----|------|-------|--------|--------|
-| f4 | src/Http/Controller.php:23 | Missing return type | code-reviewer | add |
-| f5 | src/Models/User.php:45-50 | Simplify conditional | laravel-simplifier, code-simplifier | change |
-```
-
-### Section 4: Conflicts within this review (if any)
-
-```
-### ⚠️ Conflicting advice (this review)
-
-| File | Agent A says | Agent B says |
+| File | Skill A says | Skill B says |
 |------|--------------|--------------|
 | src/Example.php:10 | Add validation | Remove validation (redundant) |
 ```
 
-### Section 5: Agent summary
+### Section 2: Findings
 
-List each agent that ran and how many issues it found (including "0 issues" for agents that found nothing).
+```
+### Findings
 
-## Step 9 — Await instructions
+| ID | File | Issue | Skills | Action |
+|----|------|-------|--------|--------|
+| f1 | src/Services/AuthService.php:23 | N+1 query: missing eager load | laravel-best-practices | change |
+| f2 | src/Services/AuthService.php:45 | Silent failure: catch without logging | pr-review-toolkit:silent-failure-hunter | add |
+| f3 | src/Views/login.tsx:67 | Button too small (36px, min 44px) | /design-review | change |
+| f4 | src/Services/AuthService.php:12-18 | Repeated validation logic | /simplify, laravel-simplifier | change |
+```
 
-After presenting the report, use the AskUserQuestion tool to prompt the user:
+### Section 3: Skill summary
+
+List each skill that ran, how many issues it found, and note any that were skipped (not installed or errored).
+
+## Step 8 — Await instructions
+
+After presenting the report, use AskUserQuestion to prompt the user:
 
 - **Question**: "How would you like to proceed?"
 - **Header**: "Next step"
-- **Options** (2–3):
+- **Options**:
   1. Label: "Fix all" — Description: "Apply all non-conflicting fixes automatically"
-  2. Label: "Done / Stop" — Description: "Exit the review cycle without applying any fixes"
-  3. (Only include if contradictions are present) Label: "Resolve conflicts first" — Description: "Decide on conflicting advice before fixing"
+  2. Label: "Done / Stop" — Description: "Exit review without applying fixes"
+  3. (Only if conflicts exist) Label: "Resolve conflicts first" — Description: "Decide on conflicting advice before fixing"
 
-The tool automatically adds an "Other" option — use that for specific ID inputs like "fix f1, f4" or "dismiss f2".
+The tool automatically adds an "Other" option for specific IDs like "fix f1, f4" or "dismiss f2".
 
-Then handle the response per the decision table below. Track their decisions:
+Handle the response:
 
-- **"fix all"** or **"fix everything"**: Fix all non-conflicting issues. For conflicts, ask which approach to take. Mark fixed items as `applied`.
-- **"fix f1, f4"** (specific IDs): Fix only those. Mark as `applied`.
-- **"ignore f2"** or **"dismiss f2"**: Mark as `dismissed`.
-- **"keep previous"** (for contradictions): Keep the previously applied approach, dismiss the new suggestion.
-- **"use new"** (for contradictions): Apply the new suggestion, mark old as superseded.
-- **"done"** or **"stop"**: Exit the review cycle immediately and proceed to Step 10.
+- **"fix all"**: Fix all non-conflicting issues. For conflicts, ask which approach to take.
+- **"fix f1, f4"** (specific IDs): Fix only those.
+- **"ignore f2"** / **"dismiss f2"**: Skip those findings.
+- **"keep previous"** / **"use new"** (for conflicts): Apply accordingly.
+- **"done"** / **"stop"**: Exit immediately without applying any fixes.
 
-Do NOT apply fixes that contradict each other — resolve conflicts first.
+## Step 9 — Apply fixes
 
-### After applying fixes
+For each approved finding:
 
-After applying fixes, immediately save review history to disk (same format as Step 10). Include a `pass` field and a `fixed_files` array listing the files modified in this pass. This ensures progress survives context compaction.
+- Read the file
+- Apply the fix (add, remove, or change code as suggested)
+- Write the file back
+- If Edit fails, report the error and ask the user to intervene
 
-If any fixes were applied and the current pass is less than 3, loop back to Step 3 for a scoped re-review of only the files just modified.
+After all approved fixes are applied, summarize what was changed.
 
-If no fixes were applied (all findings dismissed or only flags), or the user said "done"/"stop", or this is pass 3, exit the cycle and proceed to Step 10. On the final pass, if findings remain, note them in the report so the user is aware.
+## Step 10 — Done
 
-## Step 10 — Save review history
-
-After the review cycle completes (clean, user stopped, or 3 passes done), save the consolidated history from all passes to `.claude/review-history.json`:
-
-```json
-{
-  "branch": "<current branch>",
-  "reviewed_at": "<ISO timestamp>",
-  "head_commit": "<HEAD commit hash>",
-  "findings": [
-    {
-      "id": "f1",
-      "file": "src/Example.php",
-      "lines": "45-52",
-      "agents": ["agent-name"],
-      "action": "remove|add|change|flag",
-      "summary": "Brief description of the issue",
-      "status": "pending|applied|dismissed"
-    }
-  ]
-}
-```
-
-Only save findings from the current review session. Previous history is replaced, not appended — we only track the most recent review per branch.
-
-Create the `.claude/` directory if it doesn't exist. Ensure `.claude/review-history.json` is in `.gitignore` if the user doesn't want it committed (ask on first save if `.gitignore` exists but doesn't include it).
-
-## Step 11 — Run /simplify
-
-After the review cycle is complete and history is saved, run the built-in `/simplify` skill as a final polish pass. This covers code reuse, quality, and efficiency checks that the review cycle's remaining agents do not.
-
-Use the Skill tool to invoke `simplify`. It will review the changed code and fix any reuse, quality, or efficiency issues it finds.
-
-Skip this step if the user said "done"/"stop" during Step 9 — they want to exit, not run more checks.
-
----
-
-# Loop Mode
-
-When invoked with `/review loop` (or when called from the `review-loop` script), behavior changes as follows:
-
-## Differences from interactive mode
-
-| Step | Interactive | Loop |
-|------|-------------|------|
-| Step 8 (Report) | Full formatted report | Brief summary only |
-| Step 9 (Await) | Wait for user input | Auto-decide and fix immediately |
-| Exit | Continue conversation | Create state file and exit |
-
-## Loop mode behavior (replaces Steps 8-10)
-
-After consolidation (Step 7), proceed automatically:
-
-### L1. Evaluate findings
-
-- **No issues found**: Create `.review-clean` with message "No issues found" and exit immediately.
-- **Only unresolvable conflicts**: Create `.review-stuck` with conflict details and exit.
-- **Fixable issues exist**: Continue to L2.
-
-### L2. Auto-fix all issues
-
-Apply fixes automatically using these rules:
-
-1. Fix all non-conflicting issues without asking.
-2. For within-session conflicts: prefer the simpler/shorter approach.
-3. For contradictions with previous review: prefer the current suggestion (let the review evolve).
-4. Skip any issues marked `dismissed` in previous history.
-
-If a fix fails 3 times on the same issue, create `.review-stuck` with the issue details and error, then exit.
-
-### L3. Save history
-
-Save review history as normal (Step 10), marking fixed items as `applied`.
-
-### L3b. Run /simplify
-
-Use the Skill tool to invoke `simplify`. It will review and fix reuse, quality, and efficiency issues. Any files it modifies should be added to the `fixed_files` list for the next iteration's scoped re-review.
-
-### L4. Signal continuation
-
-Create `.review-continue` containing a brief summary of what was fixed:
-
-```
-Fixed 3 issues:
-- f1: Removed unused variable (src/Example.php:45)
-- f2: Added return type (src/Controller.php:23)
-- f3: Simplified conditional (src/User.php:50)
-```
-
-Then exit. The calling script will run another iteration.
-
-## State files
-
-The loop mode communicates with the calling script via state files in the repo root:
-
-| File | Meaning | Script action |
-|------|---------|---------------|
-| `.review-clean` | No issues found | Exit successfully |
-| `.review-stuck` | Can't proceed (conflicts or repeated failures) | Exit with error |
-| `.review-continue` | Fixes applied, may need another pass | Run next iteration |
-
-These files are temporary and deleted by the script after reading.
-
-## The review-loop script
-
-Located at `~/.local/bin/review-loop`. Usage:
-
-```bash
-review-loop [-f|--force] [iterations]
-```
-
-- `-f`, `--force`: Allow running on main/master (passed through to `/review loop --force`)
-- `iterations`: Maximum review cycles (default: 5)
-- Runs `/review loop` repeatedly until clean, stuck, or max iterations
-- Safe to run overnight on a feature branch
+Exit the review. If any findings remain unapplied, remind the user they can re-run `/review` to address them.

@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-04-15
+
+### Changed
+
+- **mella plugin** (v1.7.0) — `review` skill rebuilt as an orchestrator
+
+  The `review` skill has been completely rewritten. It no longer runs inline agents itself — instead it detects what changed and delegates to specialised review skills, consolidating their findings into a single report.
+
+  **Orchestrated skills (always):**
+  - `/review` (gstack) — structural issues: SQL safety, LLM trust boundaries, conditional side effects
+  - `/simplify` — code reuse, quality, and efficiency (final pass)
+
+  **Orchestrated skills (Laravel projects):**
+  - `laravel-best-practices` — 125+ rules across N+1, caching, eloquent, security, architecture, migrations. Gracefully skipped if not installed.
+  - `laravel-simplifier:laravel-simplifier` — Laravel-specific code clarity, PSR-12 and Laravel conventions
+
+  **Orchestrated skills (conditional on diff content):**
+  - `/design-review` (gstack) — if frontend files detected
+  - `/devex-review` (gstack) — if config/tooling files detected
+  - `pr-review-toolkit:silent-failure-hunter` — if error handling patterns detected
+  - `pr-review-toolkit:type-design-analyzer` — if new type/interface definitions detected
+  - `pr-review-toolkit:pr-test-analyzer` — if test files changed or added
+  - `pr-review-toolkit:comment-analyzer` — if comments added or modified
+
+  Independent conditional skills run in parallel. Sequential order is preserved for structural baseline (`/review`), Laravel skills, and final polish (`/simplify`).
+
+  **Frontmatter improvements:**
+  - `disable-model-invocation: true` — you control when the review runs; Claude won't auto-invoke it
+  - `effort: high` — full attention for multi-skill orchestration
+  - `context: fork` — runs isolated from conversation history; reviewers see the diff, not the chat
+  - `allowed-tools` — pre-approves Bash, Read, Edit, Write, Grep, Glob, Skill to avoid mid-review prompts
+  - `when_to_use` — trigger phrases for autocomplete
+
+### Removed
+
+- **Loop mode** — `/review loop` and the `review-loop` script integration are gone. The skill is now single-pass only.
+- **`--stack` argument** — stack is now auto-detected from the project; explicit override is no longer supported.
+- **Review history file** — `.claude/review-history.json` is no longer written. History persistence was only needed to support loop mode.
+
 ## [1.6.1] - 2026-04-14
 
 ### Changed
