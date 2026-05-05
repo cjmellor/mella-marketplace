@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.1] - 2026-05-05
+
+### Fixed
+
+- **mella plugin** (v1.7.1) — `review-bot` skill no longer self-triggers the review bot
+
+  The triage summary comment posted to the PR previously included `from @botname`. When the bot being triaged was `@claude` (or any other registered GitHub user), GitHub resolved the `@mention` and pinged the bot, which kicked off a fresh review on the same PR — a self-perpetuating loop. Fixed by removing the bot mention from the posted comment body and adding a guard note in the skill explaining why no `@mention`s should ever be added back.
+
 ## [1.7.0] - 2026-04-15
 
 ### Changed

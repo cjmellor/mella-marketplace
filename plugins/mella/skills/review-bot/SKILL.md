@@ -176,12 +176,14 @@ Compose a single comment on the PR:
 gh pr comment <PR_NUMBER> --body "<comment body>"
 ```
 
-Use a HEREDOC for the body to preserve formatting. The comment structure:
+Use a HEREDOC for the body to preserve formatting. **Do not include `@bot-username` (or any `@mention`) in the body** — GitHub resolves it as a user mention and re-triggers the bot, kicking off another review loop. Refer to the bot generically (e.g. "the review bot") instead.
+
+The comment structure:
 
 ```markdown
 ## Review Bot Triage
 
-Reviewed **N** comments from @botname.
+Reviewed **N** review bot comments.
 
 ### Applied fixes (Y)
 
