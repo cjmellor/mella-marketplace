@@ -1,185 +1,135 @@
 ---
 name: review
-description: Orchestrated pre-PR code review. Invokes review skills based on what changed — structural issues, Laravel patterns, visual polish, DX, code quality. Use when reviewing code, checking changes, or before committing/creating a PR.
-when_to_use: "review my code, check my changes, pre-PR review, before committing, before creating a PR, check for issues, run a code review, look over my diff"
-argument-hint: "[--force]"
+description: Use this skill any time a user wants their code, diff, or branch reviewed before committing, pushing, or opening a PR. Triggers on: "check my changes", "look over my diff", "review this before I merge", "take a look at my branch", "anything look off?", "second set of eyes", "review PR #N", checking commits just pushed, or pre-PR sanity checks. Runs all installed review skills (security, code quality, simplification) in parallel and consolidates findings into one actionable report. Use for code review intent — not for git help, writing PR descriptions, or explaining diffs.
+when_to_use: "review my code, check my changes, pre-PR review, before committing, before creating a PR, check for issues, run a code review, look over my diff, review this PR"
+argument-hint: "[--sequential] [--force] [PR#]"
 context: fork
 disable-model-invocation: true
-effort: high
-allowed-tools: Bash Read Edit Write Grep Glob Skill
+model: opus
+effort: xhigh
+allowed-tools: Bash Read Edit Write Grep Glob Skill Agent TaskCreate TaskGet TaskList TaskOutput TaskStop TaskUpdate
 ---
 
 # /review Skill
 
-Single-pass orchestrated code review. Analyzes branch changes, selects appropriate review skills based on what changed, consolidates findings, and lets you choose which fixes to apply.
+No skills are skipped based on diff content. Only hard gates apply: PR required, Laravel required, not installed.
 
 ## Step 0 — Plan mode guard
 
-**If you are currently in plan mode, stop immediately.** Tell the user:
+If in plan mode: stop. Tell the user to exit plan mode first — Edit/Write are required.
 
-> "/review requires Edit and Write access to apply fixes. You're in plan mode, which blocks those tools. Please exit plan mode first, then re-run `/review`."
-
-Do not proceed to Step 1.
-
-## Step 1 — Check branch
-
-Run `git branch --show-current` to get the current branch name.
-
-- If on `main` or `master` **and** the user did NOT pass `--force`: warn the user: "You're on main — nothing to review." and stop.
-- If on `main` or `master` **with** `--force`: continue, but use `HEAD~1` instead of `main` as the diff base.
-- Otherwise, continue.
-
-## Step 2 — Gather diff
-
-Get all changes compared to the base:
+## Step 1 — Gather context
 
 ```bash
-git diff main...HEAD    # or git diff HEAD~1...HEAD if --force on main/master
+git branch --show-current
+git diff main...HEAD 2>/dev/null || git diff master...HEAD 2>/dev/null || git diff HEAD~1
 git diff
 git diff --cached
 git rev-parse HEAD
+gh pr view --json number,url,title,body 2>/dev/null || echo "NO_PR"
+test -f artisan && echo "LARAVEL" || (cat composer.json 2>/dev/null | grep -q '"laravel/framework"' && echo "LARAVEL" || echo "NOT_LARAVEL")
 ```
 
-Combine these into the full set of changed files and their diffs. If there are no changes at all, tell the user and stop.
+- On `main`/`master` without `--force`: warn and stop.
+- On `main`/`master` with `--force`: use `HEAD~1` as diff base.
+- No changes at all: tell user and stop.
+- `HAS_PR`: true if `gh pr view` returned a valid number, or a PR# was passed as argument.
+- `IS_LARAVEL`: true if `artisan` exists or `laravel/framework` in `composer.json`.
+- `IS_SEQUENTIAL`: true if the literal string `--sequential` appears anywhere in the arguments this skill was invoked with.
 
-## Step 3 — Classify changes
+## Step 2 — Probe installed skills
 
-Scan the combined diff and changed file paths to detect:
-
-- **Laravel project**: Check for `artisan` file in repo root OR `laravel/framework` in `composer.json`
-- **Error handling patterns**: try/catch, catch blocks, `.catch()`, fallback logic, empty catch
-- **New type/interface definitions**: class, interface, type, enum declarations (newly added)
-- **Test files**: files matching `*Test.php`, `*_test.go`, `*.test.ts`, `*.spec.ts`, `tests/`, `test/`
-- **Comments added or modified**: any new or changed comments, docstrings, PHPDoc, JSDoc, inline comments
-- **Frontend files**: `.tsx`, `.jsx`, `.ts`, `.js`, `.css`, `.scss` in `src/`, `app/`, `components/`, `resources/`
-- **Config/tooling files**: `package.json`, `composer.json`, `Dockerfile`, `tsconfig.json`, `vite.config.ts`, `.env*`, `makefile`, `webpack.config.*`, CI/CD files (`.github/workflows/`, `Jenkinsfile`)
-
-Store all detected categories for use in Step 4.
-
-## Step 4 — Select skills to invoke
-
-Based on classification, build the list of skills to run. Do NOT ask the user — tell them which skills will run and why, then proceed immediately to Step 5.
-
-**Always include:**
-| Skill | Reason |
-|-------|--------|
-| `/review` (gstack) | Structural issues: SQL safety, LLM trust boundaries, conditional side effects |
-| `/simplify` | Code reuse, quality, and efficiency — always runs last |
-
-**Conditionally include (Laravel project detected):**
-| Skill | Reason |
-|-------|--------|
-| `laravel-best-practices` | 125+ Laravel rules: N+1, caching, eloquent, security, architecture, migrations. Check if installed by looking for its SKILL.md. If not found, skip silently and proceed. |
-| `laravel-simplifier:laravel-simplifier` | Laravel-specific code clarity, PSR-12, Laravel conventions |
-
-**Conditionally include (based on diff content):**
-| Skill | Condition |
-|-------|-----------|
-| `/design-review` (gstack) | Frontend files detected |
-| `/devex-review` (gstack) | Config/tooling files detected |
-| `pr-review-toolkit:silent-failure-hunter` | Error handling patterns detected |
-| `pr-review-toolkit:type-design-analyzer` | New type/interface definitions detected |
-| `pr-review-toolkit:pr-test-analyzer` | Test files changed or added |
-| `pr-review-toolkit:comment-analyzer` | Comments added or modified |
-
-Present a brief summary before running: e.g. "Running 5 skills: gstack /review, laravel-best-practices, pr-review-toolkit:silent-failure-hunter, laravel-simplifier, /simplify."
-
-## Step 5 — Invoke selected skills
-
-Invoke skills using the Skill tool in this order:
-
-1. `/review` (gstack) — structural baseline first
-2. `laravel-best-practices` — if Laravel detected and installed
-3. `/design-review` (gstack) — if triggered
-4. `/devex-review` (gstack) — if triggered
-5. `pr-review-toolkit:silent-failure-hunter` — if triggered
-6. `pr-review-toolkit:type-design-analyzer` — if triggered
-7. `pr-review-toolkit:pr-test-analyzer` — if triggered
-8. `pr-review-toolkit:comment-analyzer` — if triggered
-9. `laravel-simplifier:laravel-simplifier` — if Laravel detected
-10. `/simplify` — always, last
-
-Steps 3–8 that are all triggered can be invoked in parallel (single message, multiple Skill tool calls) to save time. Steps 1, 2, 9, and 10 run sequentially as they establish context or do final polish.
-
-If any skill invocation fails or is not installed, skip it, note it in the final report, and continue with the remaining skills.
-
-## Step 6 — Consolidate findings
-
-Review all skill outputs together:
-
-1. **Identify duplicates**: Multiple skills may flag the same issue. Keep the most detailed explanation and note which skills agreed (more agreement = higher confidence).
-2. **Identify contradictions**: One skill suggests adding code that another suggests removing. Label as "⚠️ Conflicting advice" and let the user decide.
-3. **Prioritize by confidence**: Multi-skill agreement elevates a finding's priority.
-4. **Normalize format**: Convert each skill's output into a consistent finding:
-   - ID (f1, f2, ...)
-   - File and line range
-   - Issue summary
-   - Suggested action (add / remove / change / flag)
-   - Which skills reported it
-
-## Step 7 — Present report
-
-Present a single consolidated report in this order:
-
-### Section 1: Conflicts (if any)
-
-```
-### ⚠️ Conflicting advice
-
-| File | Skill A says | Skill B says |
-|------|--------------|--------------|
-| src/Example.php:10 | Add validation | Remove validation (redundant) |
+```bash
+find ~/.claude/plugins/cache -name "review-pr.md" -path "*/commands/*" 2>/dev/null | head -1
+find ~/.claude/plugins/cache -name "code-review.md" -path "*/commands/*" 2>/dev/null | head -1
+find ~/.claude/plugins/cache -name "code-simplifier.md" -path "*/agents/*" 2>/dev/null | head -1
+find ~/.claude/plugins/cache -name "SKILL.md" -path "*laravel*best*" 2>/dev/null | head -1
 ```
 
-### Section 2: Findings
+`security-review` and `simplify` are always available — skip probing them.
 
+Build the roster from results. Then apply gates:
+- Drop `pr-review-toolkit:review-pr` and `code-review:code-review` if `HAS_PR=false`
+- Drop `laravel-best-practices` if `IS_LARAVEL=false`
+- Drop any probed skill with no probe result
+
+## Step 3 — Announce
+
+Print Mode (PR #N or local), Project (Laravel/Non-Laravel), Execution (Parallel / Sequential), Phase 1 skill list with ✓/⊘ per entry and reason for any skip, Phase 2 list. Then proceed — no confirmation needed.
+
+## Step 4 — Phase 1: Analytical review
+
+Invoke only the Phase 1 skills that survived Step 2 gates: `security-review`, `pr-review-toolkit:review-pr`, `code-review:code-review`, `laravel-best-practices`. All are invoked via **Skill tool**.
+
+**If IS_SEQUENTIAL=false (default — parallel):** Invoke all surviving Phase 1 skills as simultaneous Skill tool calls in a single response turn.
+
+**If IS_SEQUENTIAL=true:** Invoke each one at a time, awaiting full completion before starting the next, in this order:
+1. `security-review`
+2. `pr-review-toolkit:review-pr`
+3. `code-review:code-review`
+4. `laravel-best-practices`
+
+`simplify` and `code-simplifier` are Phase 2 — do not invoke here. On failure: note and continue.
+
+## Step 4.5 — Verify completeness
+
+Check that every roster Phase 1 skill was actually invoked via the Skill tool — not just mentioned or analyzed inline. Invoke any missing ones now. (This step prevents accidental hallucination of completion without real tool calls.)
+
+## Step 5 — Phase 2: Code-editor skills (staged findings)
+
+Phase 2 tools edit files — they always run sequentially, regardless of IS_SEQUENTIAL, because concurrent file edits would create git state conflicts between invocations. Capture changes per-file; present as APPLIED findings the user can revert.
+
+```bash
+git diff --name-only HEAD; git diff --name-only --cached   # BEFORE_FILES
 ```
-### Findings
 
-| ID | File | Issue | Skills | Action |
-|----|------|-------|--------|--------|
-| f1 | src/Services/AuthService.php:23 | N+1 query: missing eager load | laravel-best-practices | change |
-| f2 | src/Services/AuthService.php:45 | Silent failure: catch without logging | pr-review-toolkit:silent-failure-hunter | add |
-| f3 | src/Views/login.tsx:67 | Button too small (36px, min 44px) | /design-review | change |
-| f4 | src/Services/AuthService.php:12-18 | Repeated validation logic | /simplify, laravel-simplifier | change |
+**1. `simplify`** — invoke via Skill, then:
+```bash
+git diff --name-only HEAD; git diff --name-only --cached   # AFTER_S_FILES
 ```
+New/changed files vs `BEFORE_FILES` → attributed to simplify. For each: `git diff HEAD -- <file>`. IDs: `p2_s_1`, `p2_s_2`, ...
 
-### Section 3: Skill summary
+**2. `code-simplifier:code-simplifier`** (if in roster) — invoke via Agent, then:
+```bash
+git diff --name-only HEAD; git diff --name-only --cached   # AFTER_CS_FILES
+```
+New/changed files vs `AFTER_S_FILES` → attributed to code-simplifier. For each: `git diff HEAD -- <file>`. IDs: `p2_cs_1`, `p2_cs_2`, ...
 
-List each skill that ran, how many issues it found, and note any that were skipped (not installed or errored).
+## Step 6 — Consolidate
+
+- **Dedup**: merge Phase 1 findings that overlap on the same file+line range; keep most detailed, list all agreeing skills.
+- **Conflicts**: contradictory advice on the same location → `⚠️ CONFLICT`.
+- **Severity** (Phase 1): 3+ skills = CRITICAL, 2 = HIGH, 1 = MEDIUM. Any security finding = CRITICAL. Phase 2 findings = LOW.
+- **Normalize** each finding: ID · Status (PENDING/APPLIED) · Severity · File:Line · Issue · Skills · Action
+
+## Step 7 — Report
+
+**Section 1** — Run summary: skills run, skipped (with reason), failures.
+
+**Section 2** — Conflicts (if any): table of `File:Line | Skill A says | Skill B says`.
+
+**Section 3** — Findings table: `ID | Status | Sev | File:Line | Issue | Skills | Action`. Sort: CRITICAL first, by file, Phase 2 at bottom.
+
+**Section 4** — Stats: totals by severity and by skill.
 
 ## Step 8 — Await instructions
 
-After presenting the report, use AskUserQuestion to prompt the user:
+Use AskUserQuestion (`Header: "Next step"`, `Question: "How would you like to proceed?"`):
+1. Apply all — apply all PENDING non-conflicting; Phase 2 changes kept
+2. Done / Stop — exit; Phase 2 changes remain in working tree
+3. (if conflicts) Resolve conflicts first
 
-- **Question**: "How would you like to proceed?"
-- **Header**: "Next step"
-- **Options**:
-  1. Label: "Fix all" — Description: "Apply all non-conflicting fixes automatically"
-  2. Label: "Done / Stop" — Description: "Exit review without applying fixes"
-  3. (Only if conflicts exist) Label: "Resolve conflicts first" — Description: "Decide on conflicting advice before fixing"
-
-The tool automatically adds an "Other" option for specific IDs like "fix f1, f4" or "dismiss f2".
-
-Handle the response:
-
-- **"fix all"**: Fix all non-conflicting issues. For conflicts, ask which approach to take.
-- **"fix f1, f4"** (specific IDs): Fix only those.
-- **"ignore f2"** / **"dismiss f2"**: Skip those findings.
-- **"keep previous"** / **"use new"** (for conflicts): Apply accordingly.
-- **"done"** / **"stop"**: Exit immediately without applying any fixes.
+Handle responses:
+- `apply all` → all PENDING, ask per conflict
+- `fix/apply f1,f4` → those IDs only
+- `revert p2_*` → `git checkout -- <file>`
+- `dismiss/ignore fN` → skip
+- `done/stop` → exit; warn Phase 2 changes remain
 
 ## Step 9 — Apply fixes
 
-For each approved finding:
+For approved PENDING findings: read → edit → write. On failure: report, continue.
 
-- Read the file
-- Apply the fix (add, remove, or change code as suggested)
-- Write the file back
-- If Edit fails, report the error and ask the user to intervene
+For Phase 2 reverts: `git checkout -- <file>`. If Phase 1 fixes also touch that file, re-apply them after the revert.
 
-After all approved fixes are applied, summarize what was changed.
-
-## Step 10 — Done
-
-Exit the review. If any findings remain unapplied, remind the user they can re-run `/review` to address them.
+Summarize all changes. Remind user of any unapplied PENDING findings.

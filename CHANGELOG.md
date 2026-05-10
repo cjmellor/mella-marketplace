@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-05-10
+
+### Changed
+
+- **mella plugin** (v1.8.0) — `review` skill: new sub-skill roster, `--sequential` flag, and improved description
+
+  The review orchestrator ships with a revised set of sub-skills and a cleaner execution model.
+
+  **New Phase 1 roster (analytical, parallel by default):**
+  - `security-review` — always runs (previously gated behind `HAS_PR`)
+  - `pr-review-toolkit:review-pr` — fires all toolkit agents internally (PR-gated)
+  - `code-review` — posts a GitHub review comment (PR-gated)
+  - `laravel-best-practices` — gated on Laravel project + installed
+
+  **New Phase 2 roster (code-editing, always sequential):**
+  - `simplify` → `code-simplifier` (if installed)
+
+  **Removed:**
+  - `laravel-simplifier:laravel-simplifier` — replaced by `code-simplifier`
+  - Direct `pr-review-toolkit` sub-agent dispatch (silent-failure-hunter, type-design-analyzer, pr-test-analyzer, comment-analyzer) — these now run internally when `review-pr` is invoked
+
+  **New `--sequential` flag:** Phase 1 analytical skills can run one-at-a-time instead of all in parallel. Useful when you want to read each review as it completes.
+
+  **Other fixes:**
+  - `security-review` no longer requires a PR — runs on local diffs too
+  - `git diff` base-branch fallback handles repos without a `main` branch
+  - Phase 2 always runs sequentially regardless of `--sequential` flag (prevents git state conflicts)
+  - Dead `references/standards-reviewer.md` removed
+
 ## [1.7.1] - 2026-05-05
 
 ### Fixed

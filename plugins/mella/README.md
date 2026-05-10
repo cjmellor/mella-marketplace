@@ -45,34 +45,36 @@ This will:
 
 ### `/mella:review`
 
-Multi-agent code review with automatic fix-and-re-review cycles.
+Orchestrated code review that fires every available review skill, consolidates findings into a single report, then lets you apply or revert each finding interactively.
 
 **Usage:**
 ```bash
-/mella:review                       # Interactive review of current branch vs main
-/mella:review --stack laravel       # Explicitly specify project stack
-/mella:review --stack laravel,ios   # Multiple stacks
-/mella:review loop                  # Auto-fix mode for batch/overnight runs
-/mella:review --force               # Review latest commit on main/master
+/mella:review                   # Review current branch changes (parallel mode)
+/mella:review --sequential      # Run each analytical skill one at a time
+/mella:review --force           # Review on main/master (uses HEAD~1 as diff base)
+/mella:review 123               # Review a specific PR by number
 ```
 
-**Features:**
-- **Stack-agnostic**: Works with any codebase. Auto-detects project stacks (Laravel, iOS) from project files, or specify explicitly with `--stack`
-- **Multi-agent**: Runs review agents in parallel (code quality, bugs, standards compliance, plus stack-specific reviewers)
-- **Stack-specific reviewers**: Deep framework knowledge loaded conditionally — Laravel/PHP patterns (N+1, migration safety, Eloquent antipatterns) and iOS/Swift patterns (concurrency, memory, SwiftUI)
-- **`/simplify` integration**: Runs Claude Code's built-in `/simplify` as a final polish pass for code reuse, quality, and efficiency
-- **Conditional agents**: Automatically adds error handling, type design, test, and comment reviewers based on detected changes
-- **3-pass cycle**: Applies fixes, then re-reviews changed files, up to 3 passes
-- **Cross-session history**: Tracks previous findings per branch in `.claude/review-history.json`
-- **Loop mode**: Fully autonomous fix cycle for use with the `review-loop` script
+**How it works:**
 
-**Supported stacks:**
-| Stack | Detection | Reference file |
-|-------|-----------|---------------|
-| `laravel` | `artisan` file or `composer.json` with `laravel/framework` | `references/laravel.md` |
-| `ios` | `.swift` files in diff | `references/ios.md` |
+1. **Phase 1 — Analytical review** (parallel by default): fires all available analytical skills simultaneously and collects their findings.
+2. **Phase 2 — Code simplification** (always sequential): `simplify` then `code-simplifier` run in order, applying edits directly to your working tree.
+3. **Report**: findings are deduplicated, severity-rated, and consolidated into a single table. You can apply pending fixes, revert Phase 2 edits, or dismiss findings.
 
-To add a new stack, create a `references/<stack>.md` file and add detection logic to Step 4 in `SKILL.md`.
+**Skills invoked:**
+
+| Skill | Phase | Gate |
+|-------|-------|------|
+| `security-review` | 1 | always |
+| `pr-review-toolkit:review-pr` | 1 | PR required |
+| `code-review` | 1 | PR required |
+| `laravel-best-practices` | 1 | Laravel project + installed |
+| `simplify` | 2 | always |
+| `code-simplifier` | 2 | if installed |
+
+**Flags:**
+- `--sequential` — run Phase 1 skills one at a time instead of in parallel
+- `--force` — allow running on `main`/`master`
 
 ### `/mella:review-bot`
 

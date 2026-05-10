@@ -14,7 +14,7 @@ Productivity tools to streamline your development workflow.
 
 | Skill | Description | Triggers when... |
 |-------|-------------|------------------|
-| `review` | Multi-agent code review with 5+ parallel agents, automatic fix-and-re-review cycles, and cross-session history. Runs in an isolated context. Supports loop mode for batch runs. | You invoke `/mella:review` or say "review my code", "check my changes" |
+| `review` | Orchestrated code review that fires every available review skill (security, PR review, code quality, simplification), consolidates findings into one report, then lets you apply or revert each finding. | You invoke `/mella:review`, or say "check my changes", "look over my diff", "review before I merge" |
 | `commit` | Create git commits with optional intelligent grouping (`group`), push (`push`), and PR creation (`pr`). Automatically runs Laravel Pint linter if available. | You invoke `/mella:commit` |
 | `walkthrough` | Auto-generates step-by-step testing guides for features and bug fixes. Runs in an isolated context. | You ask Claude to "write a walkthrough", "create testing steps", or generate QA documentation |
 | `review-bot` | Triage GitHub bot review comments on PRs: re-reviews each comment against the actual code, applies valid fixes, dismisses false positives, and posts a summary comment on the PR. | You invoke `/mella:review-bot`, or say "handle the bot review", "triage bot comments on PR #N" |
