@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.1] - 2026-05-13
+
+### Fixed
+
+- **mella plugin** (v1.8.1) — `review` skill is discoverable again
+
+  Removed `disable-model-invocation: true` from `review/SKILL.md` frontmatter. The flag was added in v1.7.0 with the intent of keeping the heavy multi-skill orchestrator under explicit user control, but it had two unintended side effects:
+
+  - The model couldn't see the skill in its auto-discovery listing, so natural-language triggers documented in the README (e.g. "check my changes", "look over my diff", "review before I merge") never fired.
+  - When the bare `/review` slash command was typed, the harness's resolver could route to a different `review` skill from another installed plugin, since the mella version was hidden from the model.
+
+  With the flag removed, `mella:review` is again surfaced to the model and the documented trigger phrases work as advertised. Users who still want strict explicit invocation can keep using the namespaced `/mella:review` form.
+
 ## [1.8.0] - 2026-05-10
 
 ### Changed

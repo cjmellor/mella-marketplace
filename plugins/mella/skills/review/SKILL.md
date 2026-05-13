@@ -4,7 +4,6 @@ description: Use this skill any time a user wants their code, diff, or branch re
 when_to_use: "review my code, check my changes, pre-PR review, before committing, before creating a PR, check for issues, run a code review, look over my diff, review this PR"
 argument-hint: "[--sequential] [--force] [PR#]"
 context: fork
-disable-model-invocation: true
 model: opus
 effort: xhigh
 allowed-tools: Bash Read Edit Write Grep Glob Skill Agent TaskCreate TaskGet TaskList TaskOutput TaskStop TaskUpdate
