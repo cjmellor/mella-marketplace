@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-05-17
+
+### Changed
+
+- **mella plugin** (v1.9.0) — `review` skill renamed to `audit`; Phase 1 roster trimmed; Step 11 report-rendering fix
+
+  The orchestrator slash command is now `/mella:audit` (was `/mella:review`). Trigger phrases and the overall analytical pipeline are unchanged. Two behaviour changes ride along with the rename:
+
+  **`code-review:code-review` removed from the Phase 1 roster.** The official Anthropic plugin's final step posts a `gh pr comment` with no dry-run mode, so every unattended audit run left a PR comment — even on "no findings" results. The skill is still available standalone via `/code-review:code-review` when a PR comment is wanted.
+
+  **Step 11 report rendering.** The consolidated report is now emitted as rendered Markdown (`##` headings, pipe tables, inline `**bold**`) rather than wrapped in a triple-backtick fence. The fenced output had suppressed table, bold, and link rendering in the client, leaving the report visible only as raw Markdown source.
+
+### Removed
+
+- `/mella:review` slash command — replaced by `/mella:audit`. Update any aliases, hooks, or saved commands that reference the old name.
+
 ## [1.8.1] - 2026-05-13
 
 ### Fixed
