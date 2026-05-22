@@ -5,7 +5,7 @@
   "author": {
     "name": "Chris"
   },
-  "keywords": ["testing", "walkthrough", "documentation", "qa", "code-review", "review", "review-bot", "implement", "tdd", "safety", "database"],
+  "keywords": ["testing", "walkthrough", "documentation", "qa", "code-review", "review", "review-bot", "safety", "database"],
   "license": "MIT",
   "hooks": {
     "PreToolUse": [

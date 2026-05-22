@@ -18,9 +18,7 @@ Productivity tools to streamline your development workflow.
 | `commit` | Create git commits with optional intelligent grouping (`group`), push (`push`), and PR creation (`pr`). Automatically runs Laravel Pint linter if available. | You invoke `/mella:commit` |
 | `walkthrough` | Auto-generates step-by-step testing guides for features and bug fixes. Runs in an isolated context. | You ask Claude to "write a walkthrough", "create testing steps", or generate QA documentation |
 | `review-bot` | Triage GitHub bot review comments on PRs: re-reviews each comment against the actual code, applies valid fixes, dismisses false positives, and posts a summary comment on the PR. | You invoke `/mella:review-bot`, or say "handle the bot review", "triage bot comments on PR #N" |
-| `implement` | TDD-driven implementation with a strict Red→Green loop. Auto-detects GStack planning artifacts if present; otherwise elicits a test queue interactively. Works standalone on any project. | You invoke `/mella:implement`, or say "start building", "let's build this", "ready to implement" |
-
-Skills can be invoked directly or triggered automatically based on context. For example, after implementing a feature you can say "now write a walkthrough guide" and Claude will use the skill.
+Skills can be invoked directly or triggered automatically based on context. For example, after building a feature you can say "now write a walkthrough guide" and Claude will use the skill.
 
 ## Installation
 
@@ -57,9 +55,6 @@ Skills can be invoked directly or triggered automatically based on context. For 
 
 # Triage bot review comments on a PR
 /mella:review-bot
-
-# Start a TDD-driven implementation
-/mella:implement
 ```
 
 ## Uninstall
