@@ -57,8 +57,8 @@ echo "LARAVEL_BEST=${LARAVEL_BEST_PROBE:-NONE}"
 |---|---|---|
 | `security-review` | always | — |
 | `code-review` (built-in) | always | `--effort <EFFORT_LEVEL>` — no `--comment` |
-| `pr-review-toolkit:review-pr` | `PR_REVIEW != NONE` AND `HAS_PR=1` | — |
 | `laravel-best-practices` | `LARAVEL_BEST != NONE` AND `IS_LARAVEL=1` | — |
+| `pr-review-toolkit:review-pr` | `PR_REVIEW != NONE` AND `HAS_PR=1` | — |
 
 > `code-review:code-review` (Anthropic plugin) is excluded — it posts a `gh pr comment` on every run. The built-in `code-review` above does the same analysis without posting.
 
@@ -82,11 +82,11 @@ Dispatch table (emit one Agent tool call per in-roster row):
 |---|---|---|
 | `security-review` | — | "security-review on current diff" |
 | `code-review` | `--effort <EFFORT_LEVEL>` | "code-review on current diff" |
-| `pr-review-toolkit:review-pr` | — | "pr-review-toolkit:review-pr on current PR" |
 | `laravel-best-practices` | — | "laravel-best-practices on current diff" |
+| `pr-review-toolkit:review-pr` | — | "pr-review-toolkit:review-pr on current PR" |
 
 - **Default (parallel):** emit all in-roster Agent calls in a single response turn.
-- **`--sequential`:** emit one, wait for it to return, then next.
+- **`--sequential`:** emit one at a time in table order — broad analysis first, synthesis layer (`pr-review-toolkit`) last.
 
 ## Step 7 — Consolidate
 
