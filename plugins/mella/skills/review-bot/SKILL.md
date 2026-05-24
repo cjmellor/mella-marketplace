@@ -170,40 +170,7 @@ Handle the response:
 
 ## Step 5 — Post PR summary comment
 
-Compose a single comment on the PR:
-
-```
-gh pr comment <PR_NUMBER> --body "<comment body>"
-```
-
-Use a HEREDOC for the body to preserve formatting. **Do not include `@bot-username` (or any `@mention`) in the body** — GitHub resolves it as a user mention and re-triggers the bot, kicking off another review loop. Refer to the bot generically (e.g. "the review bot") instead.
-
-The comment structure:
-
-```markdown
-## Review Bot Triage
-
-Reviewed **N** review bot comments.
-
-### Applied fixes (Y)
-
-| Comment | File | Issue | Fix applied |
-|---------|------|-------|-------------|
-| [Link](url) | `src/Foo.php:42` | Missing null check | Added null check |
-
-### Dismissed (Z)
-
-| Comment | File | Issue | Reason |
-|---------|------|-------|--------|
-| [Link](url) | `src/Baz.php:88` | Possible N+1 | Already eager-loaded at line 72 |
-
-### Skipped — outdated
-
-- [Link](url) — `src/Old.php:10` — File no longer exists
-
-```
-
-**Omit any section that has zero items.** If nothing was dismissed, omit the "Dismissed" section entirely. Same for "Applied fixes", "Skipped", etc.
+Post a single comment using the structure in [REFERENCE.md](REFERENCE.md). Use a HEREDOC for the body to preserve formatting.
 
 ## Step 6 — Final status
 
