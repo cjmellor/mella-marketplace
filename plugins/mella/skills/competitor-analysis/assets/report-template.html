@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Competitor Analysis</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:#0a0c12; --surface:#111420; --surface2:#181c2e; --surface3:#1e2238;
+      --border:#252a42; --text:#e2e5f0; --muted:#6b7394; --accent:#6366f1;
+      --accent-glow:rgba(99,102,241,0.15); --green:#22c55e; --red:#ef4444;
+      --yellow:#f59e0b; --font:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+    }
+    body { background:var(--bg); color:var(--text); font-family:var(--font); font-size:14px; line-height:1.6; }
+
+    /* Header */
+    .site-header { background:linear-gradient(135deg,#0d0f1e 0%,#141830 50%,#0d1220 100%); border-bottom:1px solid var(--border); padding:36px 48px 28px; position:relative; overflow:hidden; }
+    .site-header::before { content:''; position:absolute; top:-60px; left:-60px; width:300px; height:300px; background:radial-gradient(circle,rgba(99,102,241,0.12) 0%,transparent 70%); pointer-events:none; }
+    .header-label { font-size:11px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:var(--accent); margin-bottom:8px; }
+    .header-title { font-size:32px; font-weight:700; letter-spacing:-0.02em; color:#fff; }
+    .header-meta { margin-top:8px; color:var(--muted); font-size:13px; display:flex; gap:20px; flex-wrap:wrap; }
+    .header-meta span::before { content:'· '; }
+    .header-meta span:first-child::before { content:''; }
+
+    /* Nav */
+    .nav-bar { background:var(--surface); border-bottom:1px solid var(--border); padding:0 48px; display:flex; gap:2px; overflow-x:auto; position:sticky; top:0; z-index:100; }
+    .nav-bar::-webkit-scrollbar { height:0; }
+    .nav-tab { padding:14px 16px; font-size:13px; font-weight:500; color:var(--muted); cursor:pointer; border:none; background:none; white-space:nowrap; border-bottom:2px solid transparent; transition:color 0.15s,border-color 0.15s; }
+    .nav-tab:hover { color:var(--text); }
+    .nav-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+
+    /* Layout */
+    .main { padding:40px 48px; max-width:1400px; }
+    .section { display:none; }
+    .section.active { display:block; }
+
+    /* Cards */
+    .card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:24px; }
+    .card-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:20px; margin-top:24px; }
+
+    /* Competitor card */
+    .comp-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden; transition:transform 0.2s; }
+    .comp-card:hover { transform:translateY(-2px); }
+    .comp-card-header { padding:20px 24px 16px; border-bottom:1px solid var(--border); display:flex; align-items:flex-start; gap:14px; }
+    .comp-avatar { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:15px; flex-shrink:0; color:#fff; }
+    .comp-name { font-weight:600; font-size:15px; }
+    .comp-icp { font-size:12px; color:var(--muted); margin-top:2px; }
+    .comp-card-body { padding:16px 24px 20px; }
+    .comp-quote { font-size:13px; font-style:italic; color:var(--text); border-left:2px solid; padding-left:12px; margin-bottom:14px; line-height:1.5; }
+    .comp-stats { display:flex; gap:16px; flex-wrap:wrap; margin-top:14px; }
+    .comp-stat { font-size:12px; color:var(--muted); }
+    .comp-stat strong { color:var(--text); display:block; font-size:14px; }
+    .tag-list { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+    .tag { font-size:11px; padding:3px 9px; border-radius:99px; background:var(--surface3); border:1px solid var(--border); color:var(--muted); }
+    .comp-section-title { font-size:11px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:var(--muted); margin:24px 0 12px; }
+
+    /* Pricing */
+    .pricing-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:16px; margin-top:8px; }
+    .pricing-card { background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:20px; }
+    .pricing-tier-name { font-weight:600; font-size:15px; margin-bottom:4px; }
+    .pricing-price { font-size:24px; font-weight:700; letter-spacing:-0.02em; }
+    .pricing-price span { font-size:13px; font-weight:400; color:var(--muted); }
+    .pricing-discount { font-size:11px; color:var(--green); margin-top:2px; }
+    .pricing-limits { font-size:12px; color:var(--muted); margin-top:8px; }
+    .pricing-highlights { margin-top:12px; }
+    .pricing-highlights li { font-size:12px; color:var(--text); list-style:none; padding:3px 0; }
+    .pricing-highlights li::before { content:'✓ '; color:var(--green); font-weight:700; }
+    .free-badge { display:inline-block; font-size:11px; padding:2px 8px; border-radius:99px; background:rgba(34,197,94,0.15); color:var(--green); border:1px solid rgba(34,197,94,0.3); margin:0 4px 4px 0; }
+    .enterprise-badge { display:inline-block; font-size:11px; padding:2px 8px; border-radius:99px; background:rgba(99,102,241,0.15); color:var(--accent); border:1px solid rgba(99,102,241,0.3); margin:0 4px 4px 0; }
+
+    /* Feature matrix */
+    .matrix-wrap { overflow-x:auto; margin-top:24px; }
+    .matrix-table { border-collapse:collapse; width:100%; }
+    .matrix-table th, .matrix-table td { padding:10px 16px; text-align:left; border-bottom:1px solid var(--border); font-size:13px; white-space:nowrap; }
+    .matrix-table th { background:var(--surface2); color:var(--muted); font-weight:600; position:sticky; top:49px; }
+    .matrix-table th:first-child { min-width:200px; }
+    .matrix-table tr:hover td { background:var(--surface2); }
+    .matrix-check { color:var(--green); font-size:16px; }
+    .matrix-cross { color:var(--red); font-size:16px; }
+    .matrix-partial { color:var(--yellow); font-size:16px; }
+
+    /* Positioning */
+    .positioning-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:20px; margin-top:24px; }
+    .pos-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:24px; }
+    .pos-headline { font-size:18px; font-weight:700; color:#fff; line-height:1.35; margin-bottom:10px; }
+    .pos-subline { font-size:13px; color:var(--text); line-height:1.5; margin-bottom:14px; }
+    .pos-cta { display:inline-block; font-size:12px; font-weight:600; padding:6px 14px; border-radius:6px; margin-bottom:14px; }
+    .pos-meta { font-size:12px; color:var(--muted); display:grid; gap:6px; }
+    .pos-meta strong { color:var(--text); }
+
+    /* Design scores */
+    .design-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:20px; margin-top:24px; }
+    .design-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:24px; }
+    .design-score-big { font-size:48px; font-weight:800; letter-spacing:-0.03em; line-height:1; }
+    .design-score-sub { font-size:12px; color:var(--muted); margin-top:4px; }
+    .design-bar { height:6px; border-radius:3px; background:var(--border); margin:12px 0; overflow:hidden; }
+    .design-bar-fill { height:100%; border-radius:3px; }
+    .design-notes { font-size:13px; color:var(--text); line-height:1.6; }
+    .design-screenshot { width:100%; border-radius:8px; margin-top:16px; border:1px solid var(--border); display:block; }
+
+    /* Review sentiment */
+    .sentiment-block { margin-top:14px; display:grid; gap:8px; }
+    .sentiment-row { font-size:12px; padding:8px 0; border-bottom:1px solid var(--border); line-height:1.5; }
+    .sentiment-row:last-child { border-bottom:none; }
+    .sentiment-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:4px; }
+    .sentiment-praised .sentiment-label { color:var(--green); }
+    .sentiment-complaints .sentiment-label { color:var(--red); }
+    .sentiment-switching .sentiment-label { color:var(--yellow); }
+    .review-rating { display:inline-block; font-size:11px; padding:2px 8px; border-radius:99px; background:rgba(245,158,11,0.12); color:var(--yellow); border:1px solid rgba(245,158,11,0.25); margin-left:8px; vertical-align:middle; }
+
+    /* Gap analysis */
+    .gap-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-top:24px; }
+    @media (max-width:700px) { .gap-grid { grid-template-columns:1fr; } }
+    .gap-col { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:24px; }
+    .gap-col-title { font-weight:600; font-size:14px; margin-bottom:14px; }
+    .gap-item { display:flex; align-items:flex-start; gap:10px; padding:8px 0; border-bottom:1px solid var(--border); font-size:13px; }
+    .gap-item:last-child { border-bottom:none; }
+    .gap-icon { font-size:16px; flex-shrink:0; margin-top:1px; }
+    .diff-angles { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:24px; margin-top:20px; }
+    .angle-item { display:flex; gap:14px; padding:12px 0; border-bottom:1px solid var(--border); font-size:13px; line-height:1.6; }
+    .angle-item:last-child { border-bottom:none; }
+    .angle-num { font-size:11px; font-weight:700; width:22px; height:22px; border-radius:6px; background:var(--accent-glow); border:1px solid rgba(99,102,241,0.3); color:var(--accent); display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px; }
+
+    /* Battlecards */
+    .battlecard-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(360px,1fr)); gap:20px; margin-top:24px; }
+    .battlecard { background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+    .battlecard-header { padding:16px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px; }
+    .battlecard-name { font-weight:600; font-size:15px; }
+    .battlecard-pitch-sub { font-size:12px; color:var(--muted); margin-top:2px; }
+    .battlecard-body { padding:16px 20px; }
+    .battlecard-row { display:flex; gap:10px; padding:10px 0; border-bottom:1px solid var(--border); font-size:13px; line-height:1.5; }
+    .battlecard-row:last-child { border-bottom:none; }
+    .battlecard-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; min-width:100px; padding-top:1px; }
+    .label-their { color:var(--muted); }
+    .label-counter { color:var(--accent); }
+    .label-win { color:var(--green); }
+    .label-lose { color:var(--red); }
+
+    /* SW */
+    .sw-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:14px; }
+    .sw-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.08em; color:var(--muted); margin-bottom:6px; }
+    .sw-list { list-style:none; }
+    .sw-list li { font-size:12px; padding:4px 0; display:flex; align-items:flex-start; gap:6px; line-height:1.5; }
+    .sw-list li .icon { flex-shrink:0; margin-top:2px; font-size:13px; }
+
+    /* Misc */
+    .summary-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:28px 32px; font-size:14px; line-height:1.75; margin-bottom:28px; }
+    .section-heading { font-size:22px; font-weight:700; letter-spacing:-0.02em; color:#fff; margin-bottom:6px; }
+    .section-sub { font-size:13px; color:var(--muted); margin-bottom:4px; }
+    .divider { height:1px; background:var(--border); margin:32px 0; }
+  </style>
+</head>
+<body>
+
+<script>
+// ======================================================================
+// DATA — Claude fills in this object. Do not modify the code below.
+// ======================================================================
+const DATA = {
+  analyzedAt: "YYYY-MM-DD",
+  product: {
+    name: "Your Product",
+    tagline: "Your product tagline",
+    description: "2–3 sentence description of what the product does and who it serves.",
+    icp: "Who you target",
+    pricing: {
+      tiers: [
+        { name: "Free", price: "$0/mo", highlights: ["Feature A", "Feature B"] },
+        { name: "Pro", price: "$29/mo", highlights: ["Everything in Free", "Feature C", "Feature D"] }
+      ]
+    },
+    strengths: ["Unique strength 1", "Unique strength 2", "Unique strength 3"],
+    uniqueFeatures: ["Feature only you have 1", "Feature only you have 2"]
+  },
+  competitors: [
+    {
+      name: "Competitor A",
+      url: "https://example.com",
+      icp: "Who they target",
+      heroHeadline: "Their exact hero headline from their homepage",
+      valueProp: "Their subheadline or value prop (exact quote)",
+      cta: "Their CTA button text",
+      toneOfVoice: "e.g. casual and friendly",
+      designScore: 7,
+      designNotes: "Notes on visual quality, clarity, and onboarding path.",
+      screenshotPath: "", // optional: relative path to screenshot, e.g. ".claude/screenshots/competitor-a.png"
+      reviewRating: "4.3/5 on G2 (450 reviews)", // or "" if not found
+      reviewPraised: ["Great onboarding experience", "Responsive support team"],
+      reviewComplaints: ["Slow reporting (G2)", "Confusing pricing tiers (Reddit)"],
+      switchingReasons: ["Missing feature X", "Price increases after acquisition"],
+      pricing: {
+        hasFree: true,
+        freeDetails: "14-day trial, no card required",
+        model: "per seat",
+        tiers: [
+          {
+            name: "Starter",
+            price: "$19/mo",
+            annualDiscount: "20% off annually",
+            limits: ["5 users", "10GB storage"],
+            highlights: ["Core feature A", "Core feature B", "Email support"]
+          },
+          {
+            name: "Growth",
+            price: "$49/mo",
+            annualDiscount: "20% off annually",
+            limits: ["25 users", "100GB storage"],
+            highlights: ["Everything in Starter", "Feature C", "Priority support"]
+          }
+        ],
+        hasEnterprise: true
+      },
+      features: {
+        notable: ["Feature X", "Feature Y", "Feature Z", "Feature W"],
+        integrations: ["Slack", "GitHub", "Zapier", "Stripe"],
+        emphasized: ["The features they highlight most in marketing"]
+      },
+      strengths: ["Strong brand recognition", "Generous free tier", "Large integration library"],
+      weaknesses: ["No mobile app", "Slow customer support", "Limited customization"],
+      battlecard: {
+        theirPitch: "One sentence summary of how they position themselves",
+        yourCounter: "One sentence why you're a better choice for shared prospects",
+        youWinWhen: "Describe the scenario, buyer type, or use case where you win",
+        theyWinWhen: "Honest description of when they would be chosen over you"
+      }
+    }
+    // Add more competitor objects here following the same structure
+  ],
+  featureMatrix: {
+    // List all features to compare across products
+    features: ["Feature 1", "Feature 2", "Feature 3", "Feature 4", "Feature 5", "Feature 6"],
+    // Keys are product/competitor names. Values are arrays matching features above.
+    // Use: true (supported), false (not supported), "partial" (limited/partial)
+    // First key should be your product name
+    coverage: {
+      "Your Product": [true, true, false, true, true, "partial"],
+      "Competitor A": [true, false, false, true, false, true],
+      "Competitor B": [false, true, true, false, false, false]
+    }
+  },
+  gapAnalysis: {
+    youHaveTheyDont: [
+      "Unique capability 1 — brief explanation of why this matters",
+      "Unique capability 2 — brief explanation"
+    ],
+    theyHaveYouDont: [
+      "Gap 1 — which competitors have it",
+      "Gap 2 — which competitors have it"
+    ],
+    differentiationAngles: [
+      "Angle 1: Position as [X] for [audience] — expand on why this works given the research",
+      "Angle 2: Emphasize [unique strength] against [common competitor weakness] — rationale",
+      "Angle 3: [third angle]"
+    ]
+  },
+  summary: "Executive summary paragraph. Describe the overall competitive landscape, the major players, pricing norms in this space, and where this product is uniquely positioned. Include 2–3 strategic observations a founder or marketer would find most valuable."
+};
+// ======================================================================
+</script>
+
+<header class="site-header">
+  <div class="header-label">Competitive Intelligence</div>
+  <div class="header-title" id="hdr-title"></div>
+  <div class="header-meta" id="hdr-meta"></div>
+</header>
+<nav class="nav-bar" id="nav-bar"></nav>
+<div class="main">
+  <section class="section active" id="sec-overview"></section>
+  <section class="section" id="sec-pricing"></section>
+  <section class="section" id="sec-features"></section>
+  <section class="section" id="sec-positioning"></section>
+  <section class="section" id="sec-design"></section>
+  <section class="section" id="sec-gaps"></section>
+  <section class="section" id="sec-battlecards"></section>
+</div>
+
+<script>
+// ── Utilities ────────────────────────────────────────────────────────
+
+// Escape HTML entities so data values are always safe when set via textContent
+// (We use textContent throughout, but this guard ensures correctness if reused)
+function esc(val) { return String(val == null ? '' : val); }
+
+const PALETTE = ['#6366f1','#f59e0b','#22c55e','#ef4444','#3b82f6','#8b5cf6','#ec4899','#14b8a6','#f97316','#06b6d4'];
+const cc = i => PALETTE[i % PALETTE.length];
+const scoreColor = s => s >= 8 ? '#22c55e' : s >= 6 ? '#f59e0b' : '#ef4444';
+
+function mk(tag, cls) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  return e;
+}
+function txt(tag, cls, content) {
+  const e = mk(tag, cls);
+  e.textContent = esc(content);
+  return e;
+}
+function add(parent, ...kids) {
+  kids.forEach(k => { if (k) parent.appendChild(k); });
+  return parent;
+}
+function css(el, styles) {
+  Object.assign(el.style, styles);
+  return el;
+}
+
+// ── Nav ──────────────────────────────────────────────────────────────
+const TABS = ['overview','pricing','features','positioning','design','gaps','battlecards'];
+const TAB_LABELS = ['Overview','Pricing','Features','Positioning','Design','Gap Analysis','Battlecards'];
+const nav = document.getElementById('nav-bar');
+TABS.forEach((id, i) => {
+  const btn = mk('button', 'nav-tab' + (i === 0 ? ' active' : ''));
+  btn.textContent = TAB_LABELS[i];
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('sec-' + id).classList.add('active');
+  });
+  nav.appendChild(btn);
+});
+
+// ── Header ───────────────────────────────────────────────────────────
+document.getElementById('hdr-title').textContent = DATA.product.name + ' · Competitor Analysis';
+const metaEl = document.getElementById('hdr-meta');
+['Analyzed ' + DATA.analyzedAt, DATA.competitors.length + ' competitors', DATA.product.tagline].forEach(m => {
+  metaEl.appendChild(txt('span', '', m));
+});
+
+// ── Overview ─────────────────────────────────────────────────────────
+(function() {
+  const sec = document.getElementById('sec-overview');
+  add(sec, txt('div','section-heading','Overview'), txt('div','section-sub', DATA.competitors.length + ' competitors analyzed'));
+
+  const summary = txt('div','summary-card', DATA.summary);
+  sec.appendChild(summary);
+
+  // Your product card
+  const yc = mk('div','card');
+  css(yc, { borderColor:'rgba(99,102,241,0.4)', background:'linear-gradient(135deg,#111420 0%,#13162a 100%)' });
+  const yh = css(mk('div'), { display:'flex', alignItems:'center', gap:'14px', marginBottom:'14px' });
+  const ya = css(txt('div','comp-avatar', DATA.product.name.charAt(0)), { background:'#6366f1' });
+  const yi = mk('div');
+  add(yi, css(txt('div','comp-name', DATA.product.name), { fontSize:'16px' }), txt('div','comp-icp', DATA.product.icp));
+  add(yh, ya, yi);
+  add(yc, yh, txt('p','', DATA.product.description));
+  if (DATA.product.uniqueFeatures && DATA.product.uniqueFeatures.length) {
+    const uf = mk('div');
+    const ul = css(txt('div','comp-section-title','Unique to you'), { marginTop:'14px' });
+    const tags = mk('div','tag-list');
+    DATA.product.uniqueFeatures.forEach(f => {
+      const t = txt('span','tag', f);
+      css(t, { borderColor:'rgba(99,102,241,0.4)', color:'#a5b4fc' });
+      tags.appendChild(t);
+    });
+    add(uf, ul, tags);
+    yc.appendChild(uf);
+  }
+  sec.appendChild(yc);
+
+  // Competitor grid
+  sec.appendChild(css(txt('div','comp-section-title','Competitors'), { marginTop:'28px' }));
+  const grid = mk('div','card-grid');
+  DATA.competitors.forEach((c, i) => {
+    const color = cc(i);
+    const card = mk('div','comp-card');
+    css(card, { borderTopColor:color, borderTopWidth:'3px' });
+
+    const hdr = mk('div','comp-card-header');
+    const av = css(txt('div','comp-avatar', c.name.charAt(0)), { background:color+'22', border:'1px solid '+color+'44', color:color });
+    const nameWrap = mk('div');
+    const nameLink = mk('a','comp-name');
+    nameLink.href = c.url;
+    nameLink.target = '_blank';
+    nameLink.textContent = c.name + ' ↗';
+    css(nameLink, { color:'inherit', textDecoration:'none' });
+    const nameRow = mk('div');
+    css(nameRow, { display:'flex', alignItems:'center', flexWrap:'wrap', gap:'4px' });
+    nameRow.appendChild(nameLink);
+    if (c.reviewRating) nameRow.appendChild(txt('span','review-rating', c.reviewRating));
+    add(nameWrap, nameRow, txt('div','comp-icp', c.icp));
+    add(hdr, av, nameWrap);
+    card.appendChild(hdr);
+
+    const body = mk('div','comp-card-body');
+    const quote = css(txt('div','comp-quote', '"' + c.heroHeadline + '"'), { borderColor:color });
+    body.appendChild(quote);
+
+    const stats = mk('div','comp-stats');
+    const ds = mk('div','comp-stat');
+    add(ds, css(txt('strong','', c.designScore + '/10'), { color:scoreColor(c.designScore), display:'block', fontSize:'14px' }), txt('span','','Design'));
+    const freeText = c.pricing.hasFree ? c.pricing.freeDetails : 'No free tier';
+    const ps = mk('div','comp-stat');
+    add(ps, txt('strong','', c.pricing.tiers.length + ' tier' + (c.pricing.tiers.length !== 1 ? 's' : '')), txt('span','',freeText));
+    css(ps.querySelector('strong'), { display:'block', fontSize:'14px', color:'var(--text)' });
+    const ms = mk('div','comp-stat');
+    add(ms, txt('strong','', c.pricing.model), txt('span','','Pricing model'));
+    css(ms.querySelector('strong'), { display:'block', fontSize:'14px', color:'var(--text)' });
+    add(stats, ds, ps, ms);
+    body.appendChild(stats);
+
+    if (c.features && c.features.notable && c.features.notable.length) {
+      body.appendChild(txt('div','comp-section-title','Notable features'));
+      const tags = mk('div','tag-list');
+      c.features.notable.slice(0,5).forEach(f => tags.appendChild(txt('span','tag',f)));
+      body.appendChild(tags);
+    }
+    card.appendChild(body);
+    grid.appendChild(card);
+  });
+  sec.appendChild(grid);
+})();
+
+// ── Pricing ──────────────────────────────────────────────────────────
+(function() {
+  const sec = document.getElementById('sec-pricing');
+  add(sec, txt('div','section-heading','Pricing Comparison'));
+
+  function tierGrid(tiers, color) {
+    const g = mk('div','pricing-grid');
+    tiers.forEach(t => {
+      const card = mk('div','pricing-card');
+      css(card, { borderTopColor:color, borderTopWidth:'2px' });
+      add(card, txt('div','pricing-tier-name', t.name));
+      const priceEl = mk('div','pricing-price');
+      priceEl.textContent = t.price;
+      priceEl.appendChild(txt('span','','/mo'));
+      card.appendChild(priceEl);
+      if (t.annualDiscount) card.appendChild(txt('div','pricing-discount', t.annualDiscount));
+      if (t.limits && t.limits.length) card.appendChild(txt('div','pricing-limits', t.limits.join(' · ')));
+      if (t.highlights && t.highlights.length) {
+        const ul = mk('ul','pricing-highlights');
+        t.highlights.forEach(h => ul.appendChild(txt('li','',h)));
+        card.appendChild(ul);
+      }
+      g.appendChild(card);
+    });
+    return g;
+  }
+
+  sec.appendChild(css(txt('div','comp-section-title', DATA.product.name + ' (your product)'), {}));
+  sec.appendChild(tierGrid(DATA.product.pricing.tiers, '#6366f1'));
+
+  DATA.competitors.forEach((c, i) => {
+    const color = cc(i);
+    sec.appendChild(mk('div','divider'));
+    sec.appendChild(css(txt('div','comp-section-title', c.name), { color:color }));
+    const badges = css(mk('div'), { display:'flex', gap:'8px', marginBottom:'12px', flexWrap:'wrap' });
+    if (c.pricing.hasFree) badges.appendChild(txt('span','free-badge','✓ ' + c.pricing.freeDetails));
+    if (c.pricing.hasEnterprise) badges.appendChild(txt('span','enterprise-badge','Enterprise available'));
+    badges.appendChild(txt('span','tag', c.pricing.model));
+    sec.appendChild(badges);
+    sec.appendChild(tierGrid(c.pricing.tiers, color));
+  });
+})();
+
+// ── Features ─────────────────────────────────────────────────────────
+(function() {
+  const sec = document.getElementById('sec-features');
+  add(sec,
+    txt('div','section-heading','Feature Matrix'),
+    txt('div','section-sub','✓ supported  ✗ not supported  ~ partial / limited')
+  );
+
+  const fm = DATA.featureMatrix;
+  const names = Object.keys(fm.coverage);
+  const wrap = mk('div','matrix-wrap');
+  const table = mk('table','matrix-table');
+  const thead = mk('thead'); const hrow = mk('tr');
+  hrow.appendChild(mk('th'));
+  names.forEach((n, ni) => {
+    const th = txt('th','', n);
+    if (ni === 0) css(th, { color:'#a5b4fc', fontWeight:'700' });
+    else {
+      const ci = DATA.competitors.findIndex(c => c.name === n);
+      if (ci >= 0) css(th, { color:cc(ci) });
+    }
+    hrow.appendChild(th);
+  });
+  add(thead, hrow); table.appendChild(thead);
+
+  const tbody = mk('tbody');
+  fm.features.forEach((feat, fi) => {
+    const row = mk('tr');
+    row.appendChild(txt('td','', feat));
+    names.forEach(n => {
+      const val = fm.coverage[n][fi];
+      const td = txt('td', val === true ? 'matrix-check' : val === false ? 'matrix-cross' : 'matrix-partial',
+        val === true ? '✓' : val === false ? '✗' : '~');
+      row.appendChild(td);
+    });
+    tbody.appendChild(row);
+  });
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+  sec.appendChild(wrap);
+
+  sec.appendChild(mk('div','divider'));
+  sec.appendChild(txt('div','comp-section-title','Integrations by competitor'));
+  const igrid = mk('div','card-grid');
+  DATA.competitors.forEach((c, i) => {
+    if (!c.features || !c.features.integrations || !c.features.integrations.length) return;
+    const card = mk('div','card');
+    css(card, { borderTopColor:cc(i), borderTopWidth:'2px' });
+    card.appendChild(css(txt('strong','', c.name), { color:cc(i) }));
+    const tags = css(mk('div','tag-list'), { marginTop:'10px' });
+    c.features.integrations.forEach(f => tags.appendChild(txt('span','tag',f)));
+    add(card, tags);
+    igrid.appendChild(card);
+  });
+  sec.appendChild(igrid);
+})();
+
+// ── Positioning ──────────────────────────────────────────────────────
+(function() {
+  const sec = document.getElementById('sec-positioning');
+  add(sec, txt('div','section-heading','Copywriting & Positioning'),
+    txt('div','section-sub','Hero copy, value props, and tone of voice'));
+
+  const grid = mk('div','positioning-grid');
+  DATA.competitors.forEach((c, i) => {
+    const color = cc(i);
+    const card = mk('div','pos-card');
+    css(card, { borderTopColor:color, borderTopWidth:'3px' });
+
+    const lbl = css(txt('div','', c.name), { fontSize:'11px', fontWeight:'600', letterSpacing:'0.08em', textTransform:'uppercase', color:color, marginBottom:'14px' });
+    const headline = txt('div','pos-headline', c.heroHeadline);
+    const sub = txt('div','pos-subline', c.valueProp);
+
+    const cta = css(txt('span','pos-cta', c.cta), {
+      background: color+'22', border:'1px solid '+color+'44', color:color
+    });
+
+    const meta = mk('div','pos-meta');
+    const toneRow = mk('div');
+    add(toneRow, txt('strong','','Tone: '), txt('span','', c.toneOfVoice));
+    meta.appendChild(toneRow);
+    if (c.features && c.features.emphasized && c.features.emphasized.length) {
+      const empRow = mk('div');
+      add(empRow, txt('strong','','Emphasized: '), txt('span','', c.features.emphasized.join(', ')));
+      meta.appendChild(empRow);
+    }
+
+    // Review sentiment block
+    const hasSentiment = (c.reviewPraised && c.reviewPraised.length) ||
+                         (c.reviewComplaints && c.reviewComplaints.length) ||
+                         (c.switchingReasons && c.switchingReasons.length);
+    if (hasSentiment) {
+      const sentDiv = mk('div','sentiment-block');
+      sentDiv.style.borderTop = '1px solid var(--border)';
+      sentDiv.style.marginTop = '14px';
+      sentDiv.style.paddingTop = '14px';
+      function sentRow(cls, label, items) {
+        if (!items || !items.length) return null;
+        const row = mk('div','sentiment-row ' + cls);
+        row.appendChild(txt('div','sentiment-label', label));
+        items.forEach(item => row.appendChild(txt('div','', '· ' + item)));
+        return row;
+      }
+      add(sentDiv,
+        sentRow('sentiment-praised', '✓ Praised', c.reviewPraised),
+        sentRow('sentiment-complaints', '✗ Complained about', c.reviewComplaints),
+        sentRow('sentiment-switching', '→ Why they leave', c.switchingReasons)
+      );
+      card.appendChild(sentDiv);
+    }
+
+    add(card, lbl, headline, sub, cta, meta);
+    grid.appendChild(card);
+  });
+  sec.appendChild(grid);
+})();
+
+// ── Design ───────────────────────────────────────────────────────────
+(function() {
+  const sec = document.getElementById('sec-design');
+  add(sec, txt('div','section-heading','Design & UX Assessment'),
+    txt('div','section-sub','Scores out of 10 across visual polish, clarity, modernity, and onboarding'));
+
+  const grid = mk('div','design-grid');
+  DATA.competitors.forEach((c, i) => {
+    const color = cc(i);
+    const sc = scoreColor(c.designScore);
+    const card = mk('div','design-card');
+    css(card, { borderTopColor:color, borderTopWidth:'3px' });
+
+    const top = css(mk('div'), { display:'flex', alignItems:'flex-start', justifyContent:'space-between' });
+    const nameEl = css(txt('div','', c.name), { fontSize:'11px', fontWeight:'600', letterSpacing:'0.08em', textTransform:'uppercase', color:color });
+    const scoreWrap = mk('div');
+    add(scoreWrap, css(txt('div','design-score-big', String(c.designScore)), { color:sc }), txt('div','design-score-sub','/ 10'));
+    add(top, nameEl, scoreWrap);
+
+    const bar = mk('div','design-bar');
+    const fill = css(mk('div','design-bar-fill'), { width:(c.designScore * 10)+'%', background:'linear-gradient(90deg,'+sc+'88,'+sc+')' });
+    bar.appendChild(fill);
+
+    add(card, top, bar, txt('div','design-notes', c.designNotes));
+    if (c.screenshotPath) {
+      const img = mk('img','design-screenshot');
+      img.src = c.screenshotPath;
+      img.alt = c.name + ' homepage screenshot';
+      card.appendChild(img);
+    }
+    grid.appendChild(card);
+  });
+  sec.appendChild(grid);
+})();
+
+// ── Gap Analysis ─────────────────────────────────────────────────────
+(function() {
+  const sec = document.getElementById('sec-gaps');
+  add(sec, txt('div','section-heading','Gap Analysis'),
+    txt('div','section-sub','What you have that competitors do not, and vice versa'));
+
+  const ga = DATA.gapAnalysis;
+  const gapGrid = mk('div','gap-grid');
+
+  function gapCol(title, items, icon, borderColor) {
+    const col = mk('div','gap-col');
+    css(col, { borderTopColor:borderColor, borderTopWidth:'3px' });
+    col.appendChild(txt('div','gap-col-title', title));
+    items.forEach(item => {
+      const row = mk('div','gap-item');
+      add(row, txt('span','gap-icon', icon), txt('span','', item));
+      col.appendChild(row);
+    });
+    return col;
+  }
+
+  add(gapGrid,
+    gapCol('✦ You have, they do not', ga.youHaveTheyDont, '✓', '#22c55e'),
+    gapCol('△ They have, you do not', ga.theyHaveYouDont, '◯', '#f59e0b')
+  );
+  sec.appendChild(gapGrid);
+
+  sec.appendChild(mk('div','divider'));
+  const angles = mk('div','diff-angles');
+  const anglesHead = mk('div');
+  add(anglesHead,
+    txt('strong','','Recommended Differentiation Angles'),
+    css(txt('div','section-sub','Strategic positioning moves based on the research above'), { marginTop:'4px' })
+  );
+  angles.appendChild(anglesHead);
+  angles.appendChild(css(mk('div'), { height:'16px' }));
+  ga.differentiationAngles.forEach((a, i) => {
+    const row = mk('div','angle-item');
+    add(row, txt('div','angle-num', String(i+1)), txt('div','', a));
+    angles.appendChild(row);
+  });
+  sec.appendChild(angles);
+})();
+
+// ── Battlecards ──────────────────────────────────────────────────────
+(function() {
+  const sec = document.getElementById('sec-battlecards');
+  add(sec, txt('div','section-heading','Battlecards'),
+    txt('div','section-sub','Use these in sales conversations and competitive deals'));
+
+  const grid = mk('div','battlecard-grid');
+  DATA.competitors.forEach((c, i) => {
+    const color = cc(i);
+    const card = mk('div','battlecard');
+    css(card, { borderTopColor:color, borderTopWidth:'3px' });
+
+    const hdr = mk('div','battlecard-header');
+    const av = css(txt('div','comp-avatar', c.name.charAt(0)), { background:color+'22', border:'1px solid '+color+'44', color:color, width:'36px', height:'36px' });
+    const info = mk('div');
+    add(info, txt('div','battlecard-name', c.name), txt('div','battlecard-pitch-sub', c.battlecard.theirPitch));
+    add(hdr, av, info);
+    card.appendChild(hdr);
+
+    const body = mk('div','battlecard-body');
+    [
+      { label:'Their pitch', cls:'label-their', val:c.battlecard.theirPitch },
+      { label:'Your counter', cls:'label-counter', val:c.battlecard.yourCounter },
+      { label:'You win when', cls:'label-win', val:c.battlecard.youWinWhen },
+      { label:'They win when', cls:'label-lose', val:c.battlecard.theyWinWhen },
+    ].forEach(r => {
+      const row = mk('div','battlecard-row');
+      add(row, txt('div','battlecard-label '+r.cls, r.label), txt('div','', r.val));
+      body.appendChild(row);
+    });
+
+    body.appendChild(css(txt('div','comp-section-title','Strengths vs Weaknesses'), {}));
+    const sw = mk('div','sw-grid');
+    function swCol(items, iconChar, iconColor, label) {
+      const col = mk('div');
+      col.appendChild(txt('div','sw-label', label));
+      const ul = mk('ul','sw-list');
+      (items || []).forEach(s => {
+        const li = mk('li');
+        const icon = css(txt('span','icon', iconChar), { color:iconColor });
+        add(li, icon, txt('span','', s));
+        ul.appendChild(li);
+      });
+      col.appendChild(ul);
+      return col;
+    }
+    add(sw,
+      swCol(c.strengths, '↑', 'var(--green)', 'Strengths'),
+      swCol(c.weaknesses, '↓', 'var(--red)', 'Weaknesses')
+    );
+    body.appendChild(sw);
+    card.appendChild(body);
+    grid.appendChild(card);
+  });
+  sec.appendChild(grid);
+})();
+</script>
+</body>
+</html>
