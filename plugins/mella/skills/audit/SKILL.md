@@ -97,11 +97,6 @@ Dispatch table (emit one Agent tool call per in-roster row):
 
 ## Step 8 — Report
 
-Output as rendered Markdown (not a code block). Use `##` headings, pipe tables, `**bold**`, inline backticks. No triple-backtick fences around sections — they suppress table and bold rendering.
-
-1. **Run summary** — skills run, skipped (with reason), failures.
-2. **Conflicts** (if any) — `File:Line | Skill A says | Skill B says`.
-3. **Findings table** — `ID | Sev | File:Line | Issue | Skills | Action`, CRITICAL first.
-4. **Stats** — totals by severity and by skill.
+Fill in and output the template in `REPORT_TEMPLATE.md`. No triple-backtick fences — they suppress table and bold rendering.
 
 The skill ends here. The user can ask to apply specific findings directly in the conversation.
