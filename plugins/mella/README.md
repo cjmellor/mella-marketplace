@@ -43,38 +43,61 @@ This will:
 2. Push all commits to the remote
 3. Check if a PR exists or ask to create one
 
-### `/mella:review`
+### `/mella:audit`
 
-Orchestrated code review that fires every available review skill, consolidates findings into a single report, then lets you apply or revert each finding interactively.
+Orchestrated code review — runs all available review skills in parallel, deduplicates findings, and consolidates them into a single structured report.
 
 **Usage:**
 ```bash
-/mella:review                   # Review current branch changes (parallel mode)
-/mella:review --sequential      # Run each analytical skill one at a time
-/mella:review --force           # Review on main/master (uses HEAD~1 as diff base)
-/mella:review 123               # Review a specific PR by number
+/mella:audit                    # Review working-tree changes vs base branch (parallel)
+/mella:audit --sequential       # Run each skill one at a time (broad first, synthesis last)
+/mella:audit --force            # Review HEAD~1..HEAD when on main/master
+/mella:audit #42                # Review a specific PR by number
+/mella:audit --effort max       # Pass --effort max through to code-review
 ```
 
 **How it works:**
 
-1. **Phase 1 — Analytical review** (parallel by default): fires all available analytical skills simultaneously and collects their findings.
-2. **Phase 2 — Code simplification** (always sequential): `simplify` then `code-simplifier` run in order, applying edits directly to your working tree.
-3. **Report**: findings are deduplicated, severity-rated, and consolidated into a single table. You can apply pending fixes, revert Phase 2 edits, or dismiss findings.
+Skills run in parallel (or sequentially with `--sequential`) and their findings are deduplicated, conflict-detected, and severity-rated. The final report fills a fixed template: header · conflicts · findings table (ID · severity · file:line · issue · skills · action) · per-skill stats.
 
 **Skills invoked:**
 
-| Skill | Phase | Gate |
-|-------|-------|------|
-| `security-review` | 1 | always |
-| `pr-review-toolkit:review-pr` | 1 | PR required |
-| `code-review` | 1 | PR required |
-| `laravel-best-practices` | 1 | Laravel project + installed |
-| `simplify` | 2 | always |
-| `code-simplifier` | 2 | if installed |
+| Skill | Gate |
+|-------|------|
+| `security-review` | always |
+| `code-review` | always |
+| `laravel-best-practices` | Laravel project + installed |
+| `pr-review-toolkit:review-pr` | PR required |
 
 **Flags:**
-- `--sequential` — run Phase 1 skills one at a time instead of in parallel
+- `--sequential` — run skills one at a time; `pr-review-toolkit` always runs last as synthesis layer
 - `--force` — allow running on `main`/`master`
+- `--effort <low|medium|high|max>` — passed to `code-review` (default: `high`)
+
+### `/mella:competitor-analysis`
+
+Deep competitive intelligence — auto-detects your product, searches the web, visits competitor sites live, and produces a report.
+
+**Usage:**
+```bash
+/mella:competitor-analysis         # Deep analysis (3–5 competitors, thorough)
+/mella:competitor-analysis wide    # Wide analysis (10+ competitors, lighter coverage)
+/mella:competitor-analysis html    # Output as interactive HTML dashboard
+/mella:competitor-analysis wide html  # Both
+```
+
+**How it works:**
+
+1. Reads project files (`README.md`, `package.json`, source code) to understand what your product does.
+2. Searches the web for competitors from multiple angles (G2, Capterra, Reddit, HN, direct searches).
+3. Visits each competitor's site live — homepage, pricing, features — and mines review sites for honest user signals.
+4. Outputs a structured Markdown report or a self-contained interactive HTML dashboard.
+5. Saves findings to `.claude/competitor-data.yaml` so future runs can offer a delta update instead of a full re-analysis.
+
+**Tips:**
+- Exact hero headline quotes and CTA wording are the whole point of the copy analysis — the skill captures them.
+- Reddit/HN complaints are often more valuable than G2 ratings.
+- If a competitor's pricing is behind a login, the skill notes "not publicly listed" and uses reported pricing from review sites.
 
 ### `/mella:review-bot`
 

@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] - 2026-05-24
+
+### Added
+
+- **`/mella:competitor-analysis`** — deep competitive intelligence for any product. Auto-detects what your product does from code and docs, searches the web for competitors, visits each competitor's site live to capture pricing, features, copywriting, and positioning, then produces a structured Markdown report or a self-contained interactive HTML dashboard. Supports `deep` (3–5 thorough) or `wide` (10+ lighter) scope. Persists findings to `.claude/competitor-data.yaml` for reuse by other skills.
+
+- **`audit/REPORT_TEMPLATE.md`** — `/mella:audit` now fills in a fixed template on every run, giving consistent output: a header with branch/date/PR metadata, an optional conflicts section, a findings table (ID · severity emoji · file:line · issue · skills · action), and a per-skill stats breakdown.
+
+### Fixed
+
+- **`/mella:audit` sequential ordering** — `pr-review-toolkit:review-pr` now always runs last when `--sequential` is used, after domain-specific skills (`security-review`, `code-review`, `laravel-best-practices`). It is a synthesis layer that orchestrates its own sub-agents, so it belongs last.
+
+### Changed
+
+- **Skill documentation refactor** — all skills trimmed and reorganised to the write-a-skill guidelines (target: ~100 lines, "Use when" triggers in every description, reference files for dense tables):
+  - `commit`: 159 → 70 lines; Tips section removed; description gains trigger phrase
+  - `implement`: `Common Rationalizations` and `When Stuck` tables extracted to `TDD-RULES.md`
+  - `review-bot`: PR comment template extracted to `REFERENCE.md`
+  - `audit`: trimmed to ~100 lines; Step 8 now defers to `REPORT_TEMPLATE.md`
+
 ## [1.9.0] - 2026-05-17
 
 ### Changed
