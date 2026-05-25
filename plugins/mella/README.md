@@ -121,6 +121,28 @@ Triage review bot comments on a GitHub PR — re-review, fix, dismiss, and summa
 - **PR summary comment**: Posts a structured markdown comment on the PR with disposition for every bot comment (applied, dismissed with reason, outdated)
 - **No auto-commit**: Applies fixes to the working tree only — commit when you're ready with `/mella:commit`
 
+### `/mella:pitch`
+
+Deep-dive codebase analysis that generates innovative, high-leverage feature ideas one at a time in an interactive loop.
+
+**Usage:**
+```bash
+/mella:pitch    # Start an interactive pitch session
+```
+
+**How it works:**
+
+1. Asks a short questionnaire about your focus area, goals, constraints, and prior ideas.
+2. Spawns parallel Explore agents to analyse architecture, API surface, test coverage, dependencies, docs, and DX friction. Can also search the web for ecosystem gaps.
+3. Pitches ideas one at a time — each with a Problem, Solution, Why Now, and a Scorecard (Effort · Impact · Innovation · Alignment).
+4. After each pitch you choose: drill deeper, plan it, hear the next idea, or stop.
+5. When you pick an idea, transitions into collaborative planning — sketching files, APIs, and test scenarios until you're ready to build.
+
+**Tips:**
+- Say "just go" to skip most of the questionnaire — it'll confirm focus area and constraints only.
+- The more context you give upfront (goals, constraints, rejected ideas), the sharper the pitches.
+- Ideas are grounded in your actual code — expect references to specific files and functions, not generic advice.
+
 ### `/mella:walkthrough`
 
 Interactive walkthrough command for documentation and QA.

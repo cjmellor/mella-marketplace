@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] - 2026-05-25
+
+### Added
+
+- **`/mella:pitch`** — interactive feature ideation skill. Scans the codebase deeply (architecture, API surface, test coverage, dependencies, DX friction), then pitches innovative ideas one at a time — each with a Problem, Solution, Why Now, and Scorecard (Effort · Impact · Innovation · Alignment). Supports optional web search for ecosystem research. Transitions into collaborative planning when you pick an idea to pursue.
+
 ## [1.10.0] - 2026-05-24
 
 ### Added
