@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.0] - 2026-05-26
+
+### Changed
+
+- **`/mella:pitch` redesigned interaction model** — several behaviour changes ride along with this release:
+
+  **Inline brief and configurable count.** The skill now parses args directly: `/pitch [N] [brief]`. The leading integer sets how many ideas to generate (default: 5); remaining text is the project brief. Providing a brief skips the questionnaire entirely. Examples: `/pitch 10` · `/pitch a wedding website` · `/pitch 10 add a leaderboard`.
+
+  **Y/N/M responses instead of UI dropdowns.** After each pitch's Scorecard, the skill appends a plain-text prompt — `Reply Y to bank it · N to skip · M for more detail`. This preserves Markdown rendering in the Claude Code client; the previous `AskUserQuestion` approach caused the pitch text to revert to raw Markdown source. After all N pitches, `AskUserQuestion` is used once to offer more ideas.
+
+  **Competitor research is now automatic.** The skill always runs WebSearch for competitors, similar packages, and ecosystem positioning before showing any pitches — no longer asks whether to do so.
+
+  **Wrap-up phase.** After all pitches, accepted (Y) ideas are listed as a numbered summary and the skill offers to write a structured plan for any or all of them.
+
 ## [1.11.0] - 2026-05-25
 
 ### Added

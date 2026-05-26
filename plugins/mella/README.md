@@ -123,24 +123,27 @@ Triage review bot comments on a GitHub PR — re-review, fix, dismiss, and summa
 
 ### `/mella:pitch`
 
-Deep-dive codebase analysis that generates innovative, high-leverage feature ideas one at a time in an interactive loop.
+Deep-dive codebase analysis that generates innovative, high-leverage feature ideas one at a time with Y/N/M responses.
 
 **Usage:**
 ```bash
-/mella:pitch    # Start an interactive pitch session
+/mella:pitch                              # 5 pitches, asks for project context
+/mella:pitch 10                           # 10 pitches, asks for project context
+/mella:pitch a wedding website            # 5 pitches, brief provided — no questionnaire
+/mella:pitch 10 add a leaderboard        # 10 pitches, brief provided
 ```
 
 **How it works:**
 
-1. Asks a short questionnaire about your focus area, goals, constraints, and prior ideas.
-2. Spawns parallel Explore agents to analyse architecture, API surface, test coverage, dependencies, docs, and DX friction. Can also search the web for ecosystem gaps.
-3. Pitches ideas one at a time — each with a Problem, Solution, Why Now, and a Scorecard (Effort · Impact · Innovation · Alignment).
-4. After each pitch you choose: drill deeper, plan it, hear the next idea, or stop.
-5. When you pick an idea, transitions into collaborative planning — sketching files, APIs, and test scenarios until you're ready to build.
+1. **Brief provided** — skips the questionnaire and goes straight to research. **No brief** — asks two short questions via the UI.
+2. Runs parallel Explore agents (architecture, API surface, tests, deps, docs, DX friction) and WebSearch for competitor/ecosystem research — always, before any pitch is shown.
+3. Generates all N ideas internally, then presents them one at a time in full Markdown with a Scorecard.
+4. After each pitch: reply **Y** to bank it, **N** to skip, or **M** for more detail (then Y/N). No UI dropdowns — keeps Markdown rendered.
+5. After all pitches: offers to write a structured plan for every accepted idea.
 
 **Tips:**
-- Say "just go" to skip most of the questionnaire — it'll confirm focus area and constraints only.
-- The more context you give upfront (goals, constraints, rejected ideas), the sharper the pitches.
+- Pass the brief inline to skip setup entirely: `/mella:pitch 8 Laravel gamification package, needs a leaderboard`.
+- The count and brief are both optional and combinable in any order (count must come first if used).
 - Ideas are grounded in your actual code — expect references to specific files and functions, not generic advice.
 
 ### `/mella:walkthrough`
