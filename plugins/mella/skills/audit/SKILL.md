@@ -44,9 +44,20 @@ Parse stdout for `STATE_OK`, `BRANCH`, `DIFF_BASE`, `HAS_PR`, `IS_LARAVEL`, `COM
 
 ## Step 3 — Probe installed skills
 
+Search all skill roots in priority order: project `./.claude/skills`, project `./.agents/skills`, user `~/.claude/skills`, then plugin cache `~/.claude/plugins/cache`. First match wins.
+
 ```bash
-PR_REVIEW_PROBE=$(find ~/.claude/plugins/cache -name "review-pr.md" -path "*/commands/*" 2>/dev/null | head -1)
-LARAVEL_BEST_PROBE=$(find ~/.claude/plugins/cache -name "SKILL.md" -path "*laravel*best*" 2>/dev/null | head -1)
+_skill_probe() {
+  local name_pat="$1" path_pat="$2"
+  for root in "./.claude/skills" "./.agents/skills" "$HOME/.claude/skills" "$HOME/.claude/plugins/cache"; do
+    [ -d "$root" ] || continue
+    local hit
+    hit=$(find "$root" -name "$name_pat" -path "$path_pat" 2>/dev/null | head -1)
+    [ -n "$hit" ] && { echo "$hit"; return; }
+  done
+}
+PR_REVIEW_PROBE=$(_skill_probe "review-pr.md" "*/commands/*")
+LARAVEL_BEST_PROBE=$(_skill_probe "SKILL.md" "*laravel*best*")
 echo "PR_REVIEW=${PR_REVIEW_PROBE:-NONE}"
 echo "LARAVEL_BEST=${LARAVEL_BEST_PROBE:-NONE}"
 ```
@@ -65,6 +76,8 @@ echo "LARAVEL_BEST=${LARAVEL_BEST_PROBE:-NONE}"
 ## Step 5 — Announce
 
 Tell the user: branch, diff base, PR mode, project type, execution mode, and roster. Proceed immediately.
+
+If `IS_LARAVEL=1` AND `LARAVEL_BEST=NONE`, include this warning: "⚠️ Laravel detected but `laravel-best-practices` skill not found in any skill directory — it will be skipped. Install it or add it as a project skill to include it in future audits."
 
 ## Step 6 — Dispatch agents
 

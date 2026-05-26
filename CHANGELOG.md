@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.1] - 2026-05-26
+
+### Fixed
+
+- **`/mella:audit` skill probe now searches all skill roots.** The Step 3 probe previously only searched `~/.claude/plugins/cache`, causing project-level skills (`./.claude/skills`) and user-level skills (`~/.claude/skills`) to be silently missed. The probe now searches all four roots in priority order: `./.claude/skills` → `./.agents/skills` → `~/.claude/skills` → `~/.claude/plugins/cache`. The fix applies to both the `laravel-best-practices` and `pr-review-toolkit:review-pr` probes. An explicit warning is now emitted when a Laravel project is detected but `laravel-best-practices` is not found in any location.
+
 ## [1.12.0] - 2026-05-26
 
 ### Changed
