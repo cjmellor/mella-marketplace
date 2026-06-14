@@ -16,6 +16,14 @@
       "version": "1.12.1",
       "keywords": ["testing", "walkthrough", "documentation", "qa", "code-review", "review", "review-bot", "pitch", "ideation"],
       "license": "MIT"
+    },
+    {
+      "name": "grain",
+      "source": "./plugins/grain",
+      "description": "Automatic, always-on cross-session memory. Quietly records what you did and decided in each project, then recalls it at the start of every session.",
+      "version": "0.1.0",
+      "keywords": ["memory", "recall", "context", "session", "persistence", "brain"],
+      "license": "MIT"
     }
   ]
 }

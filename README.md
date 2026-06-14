@@ -21,6 +21,12 @@ Productivity tools to streamline your development workflow.
 | `pitch` | Deep-dive codebase analysis that generates innovative ideas one at a time. Pass a count and brief inline: `/pitch [N] [brief]`. Researches competitors automatically; Y/N/M responses keep Markdown rendered. | You invoke `/mella:pitch`, or ask "what should I build next?", "pitch me ideas", "suggest features" |
 | `review-bot` | Triage GitHub bot review comments on PRs: re-reviews each comment against the actual code, applies valid fixes, dismisses false positives, and posts a summary comment on the PR. | You invoke `/mella:review-bot`, or say "handle the bot review", "triage bot comments on PR #N" |
 
+### grain
+
+Automatic, always-on cross-session memory. grain quietly records what you did and decided in each project, then recalls it at the start of every session — so nothing important is lost to a fresh session or to context compaction. No commands to run, no setup per project.
+
+It runs entirely through three lifecycle hooks (SessionStart recalls, PreCompact checkpoints, SessionEnd finalises). Capture is pattern-based and local — **no model calls, no API keys, no cost, no network.** Memory lives as plain Markdown under `~/.claude/grain/`, keyed per project. See [`plugins/grain/README.md`](plugins/grain/README.md) for controls and details.
+
 ## Installation
 
 **1. Add the marketplace:**
@@ -33,10 +39,13 @@ Productivity tools to streamline your development workflow.
 /plugin marketplace add /path/to/mella-marketplace
 ```
 
-**2. Install the plugin:**
+**2. Install a plugin:**
 
 ```bash
 /plugin install mella@mella-marketplace
+
+# Or the always-on cross-session memory plugin
+/plugin install grain@mella-marketplace
 ```
 
 **3. Start using:**

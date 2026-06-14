@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **New plugin: `grain`** — automatic, always-on cross-session memory for Claude Code. Records what you did and decided in each project via three lifecycle hooks (SessionStart recall, PreCompact checkpoint, SessionEnd finalise), then re-injects a recent digest at the start of every session so nothing is lost to a fresh session or compaction. Capture is pattern-based and local — no model calls, no API keys, no cost, no network. Memory is stored as plain Markdown under `~/.claude/grain/`, keyed per project (git remote → repo path). Honours `<private>`/`<no-memory>` opt-out markers; hooks fail open so a session is never blocked or slowed. Initial release at v0.1.0.
+
 ## [1.12.1] - 2026-05-26
 
 ### Fixed

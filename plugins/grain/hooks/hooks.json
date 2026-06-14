@@ -1,0 +1,41 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/recall.sh",
+            "timeout": 8,
+            "statusMessage": "grain: recalling memory…"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/capture.sh precompact",
+            "timeout": 20,
+            "statusMessage": "grain: checkpointing to memory…"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/capture.sh sessionend",
+            "timeout": 20,
+            "statusMessage": "grain: saving memory…"
+          }
+        ]
+      }
+    ]
+  }
+}

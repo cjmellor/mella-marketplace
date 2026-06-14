@@ -1,0 +1,10 @@
+{
+  "name": "grain",
+  "version": "0.1.0",
+  "description": "Automatic, always-on cross-session memory for Claude Code. Quietly records what you did and decided in each project, then recalls it at the start of every session — so nothing is lost to a fresh session or compaction.",
+  "author": {
+    "name": "Chris"
+  },
+  "keywords": ["memory", "recall", "context", "session", "persistence", "brain"],
+  "license": "MIT"
+}
