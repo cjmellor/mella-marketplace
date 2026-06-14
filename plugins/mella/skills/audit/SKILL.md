@@ -44,12 +44,13 @@ Parse stdout for `STATE_OK`, `BRANCH`, `DIFF_BASE`, `HAS_PR`, `IS_LARAVEL`, `COM
 
 ## Step 3 — Probe installed skills
 
-Search all skill roots in priority order: project `./.claude/skills`, project `./.agents/skills`, user `~/.claude/skills`, then plugin cache `~/.claude/plugins/cache`. First match wins.
+Search all skill roots in priority order: project `<root>/.claude/skills`, project `<root>/.agents/skills`, user `~/.claude/skills`, then plugin cache `~/.claude/plugins/cache`. First match wins. `<root>` is the git project root so the probe works from any subdirectory, not just the project root.
 
 ```bash
+PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 _skill_probe() {
   local name_pat="$1" path_pat="$2"
-  for root in "./.claude/skills" "./.agents/skills" "$HOME/.claude/skills" "$HOME/.claude/plugins/cache"; do
+  for root in "$PROJECT_ROOT/.claude/skills" "$PROJECT_ROOT/.agents/skills" "$HOME/.claude/skills" "$HOME/.claude/plugins/cache"; do
     [ -d "$root" ] || continue
     local hit
     hit=$(find "$root" -name "$name_pat" -path "$path_pat" 2>/dev/null | head -1)

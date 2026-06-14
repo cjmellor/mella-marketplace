@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.1] - 2026-06-14
+
+### Fixed
+
+- **`/mella:audit` skill probe now anchors to the git project root.** v1.12.1 broadened the probe to search `./.claude/skills`, but used paths relative to the current working directory, so it only found project-local skills (e.g. Laravel Boost's `laravel-best-practices`) when the audit was invoked from the project root. The probe now resolves `<root>` via `git rev-parse --show-toplevel`, so project-local skills are detected from any subdirectory. (mella plugin → v1.12.2)
+
 ## [1.13.0] - 2026-06-14
 
 ### Added
