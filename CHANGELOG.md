@@ -5,12 +5,6 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.13.2] - 2026-07-05
-
-### Added
-
-- **`PITCHES.md`** — a dossier of five planned improvements to the `/mella:pitch` skill: routing codebase and ecosystem research to cheaper sub-agents so the frontier model is reserved for deciding what to pitch, a structured findings contract between those sub-agents and the synthesis step, fetching competitors' actual READMEs/docs/changelogs instead of relying on search snippets, a standard handover-dossier output format, and a cross-run pitch ledger. Implementation has not started; the dossier only documents the plan.
-
 ## [1.13.1] - 2026-06-14
 
 ### Fixed

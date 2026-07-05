@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "Mella's curated marketplace of Claude Code plugins",
-    "version": "1.13.2"
+    "version": "1.13.1"
   },
   "plugins": [
     {
