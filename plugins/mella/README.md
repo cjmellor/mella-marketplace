@@ -135,16 +135,17 @@ Deep-dive codebase analysis that generates innovative, high-leverage feature ide
 
 **How it works:**
 
-1. **Brief provided** — skips the questionnaire and goes straight to research. **No brief** — asks two short questions via the UI.
-2. Runs parallel Explore agents (architecture, API surface, tests, deps, docs, DX friction) and WebSearch for competitor/ecosystem research — always, before any pitch is shown.
-3. Generates all N ideas internally, then presents them one at a time in full Markdown with a Scorecard.
+1. **Brief provided** — skips the questionnaire and goes straight to research. **No brief** — asks two short questions via the UI. If a `PITCHES.md` from a previous run exists, its ledger is read so declined ideas aren't re-pitched.
+2. Delegates research to two cheap sub-agents running in parallel: `pitch-scout` (Haiku — codebase survey with `file:line` evidence) and `pitch-researcher` (Sonnet — identifies 3–5 competitors, reads their actual READMEs/docs/changelogs, and returns a cited feature matrix). Your invoking model is reserved for the synthesis.
+3. Generates all N ideas internally — from evidenced findings only — then presents them one at a time in full Markdown with a Scorecard.
 4. After each pitch: reply **Y** to bank it, **N** to skip, or **M** for more detail (then Y/N). No UI dropdowns — keeps Markdown rendered.
-5. After all pitches: offers to write a structured plan for every accepted idea.
+5. After all pitches: writes a `PITCHES.md` handover dossier at your repo root — an implementation brief per accepted idea (affected files, acceptance criteria, tradeoffs), a declined-ideas appendix, a suggested implementation order, and an append-only ledger of every pitch ever shown.
 
 **Tips:**
 - Pass the brief inline to skip setup entirely: `/mella:pitch 8 Laravel gamification package, needs a leaderboard`.
 - The count and brief are both optional and combinable in any order (count must come first if used).
 - Ideas are grounded in your actual code — expect references to specific files and functions, not generic advice.
+- Hand `PITCHES.md` to any model or fresh session to implement — the expensive thinking is already captured in it.
 
 ### `/mella:walkthrough`
 

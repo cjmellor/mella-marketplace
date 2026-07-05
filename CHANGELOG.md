@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.14.0] - 2026-07-05
+
+### Changed
+
+- **`/mella:pitch` — tiered research, evidenced pitches, and a handover dossier** (mella plugin → v1.13.0). Five behaviour changes ride along with this release:
+
+  **Research runs on cheap sub-agents.** Two new plugin agents do the legwork in parallel: `pitch-scout` (Haiku, read-only) surveys the codebase and `pitch-researcher` (Sonnet) handles ecosystem research. The `model: opus` pin has been removed from the skill's frontmatter, so idea synthesis now inherits whatever model you invoked `/pitch` from — the expensive brain is reserved for deciding what to pitch, not for grepping files.
+
+  **Structured findings contract.** Both agents return capped, ranked findings — every claim carrying `file:line` evidence or a source URL. Synthesis only pitches from evidenced claims; a finding without evidence doesn't exist.
+
+  **Real competitor research.** The researcher identifies 3–5 closest competitors, then fetches their actual READMEs, docs, and changelogs and returns a has/lacks/partial feature matrix with citations. Gap analysis is now built on what competitors actually ship, not search-snippet marketing copy. `unknown` cells are treated as non-evidence, never as `lacks`.
+
+  **`PITCHES.md` handover dossier.** The wrap-up phase now writes a dossier at the target project's repo root: an implementation brief per accepted pitch (affected files, acceptance criteria, tradeoffs — including M deep-dive material), a declined-ideas appendix, and a suggested implementation order. Hand it to any model or fresh session to implement.
+
+  **Cross-run pitch ledger.** `PITCHES.md` also carries an append-only ledger of every pitch ever shown, with verdict and date. Subsequent `/pitch` runs read it: declined ideas are never re-pitched unless the recorded rejection reason no longer holds (and the skill says so explicitly); banked-but-unimplemented ideas re-surface flagged *still on the table*.
+
+### Fixed
+
+- **`/mella:pitch` argument parsing** — the `$ARGUMENTS` placeholder had been stripped from the Argument Parsing section, leaving the skill instructed to parse an empty string. Restored.
+
 ## [1.13.1] - 2026-06-14
 
 ### Fixed
