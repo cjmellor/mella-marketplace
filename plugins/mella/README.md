@@ -43,37 +43,6 @@ This will:
 2. Push all commits to the remote
 3. Check if a PR exists or ask to create one
 
-### `/mella:audit`
-
-Orchestrated code review — runs all available review skills in parallel, deduplicates findings, and consolidates them into a single structured report.
-
-**Usage:**
-```bash
-/mella:audit                    # Review working-tree changes vs base branch (parallel)
-/mella:audit --sequential       # Run each skill one at a time (broad first, synthesis last)
-/mella:audit --force            # Review HEAD~1..HEAD when on main/master
-/mella:audit #42                # Review a specific PR by number
-/mella:audit --effort max       # Pass --effort max through to code-review
-```
-
-**How it works:**
-
-Skills run in parallel (or sequentially with `--sequential`) and their findings are deduplicated, conflict-detected, and severity-rated. The final report fills a fixed template: header · conflicts · findings table (ID · severity · file:line · issue · skills · action) · per-skill stats.
-
-**Skills invoked:**
-
-| Skill | Gate |
-|-------|------|
-| `security-review` | always |
-| `code-review` | always |
-| `laravel-best-practices` | Laravel project + installed |
-| `pr-review-toolkit:review-pr` | PR required |
-
-**Flags:**
-- `--sequential` — run skills one at a time; `pr-review-toolkit` always runs last as synthesis layer
-- `--force` — allow running on `main`/`master`
-- `--effort <low|medium|high|max>` — passed to `code-review` (default: `high`)
-
 ### `/mella:review-bot`
 
 Triage review bot comments on a GitHub PR — re-review, fix, dismiss, and summarise.

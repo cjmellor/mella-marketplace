@@ -14,7 +14,6 @@ Productivity tools to streamline your development workflow.
 
 | Skill | Description | Triggers when... |
 |-------|-------------|------------------|
-| `audit` | Orchestrated code review — runs security, code quality, and PR review skills in parallel, deduplicates findings, and produces a consistent structured report. | You invoke `/mella:audit`, or say "check my changes", "look over my diff", "review before I merge" |
 | `commit` | Create git commits with optional intelligent grouping (`group`), push (`push`), and PR creation (`pr`). Automatically runs Laravel Pint linter if available. | You invoke `/mella:commit` |
 | `walkthrough` | Auto-generates step-by-step testing guides for features and bug fixes. Runs in an isolated context. | You ask Claude to "write a walkthrough", "create testing steps", or generate QA documentation |
 | `pitch` | Deep-dive codebase analysis that generates innovative ideas one at a time. Pass a count and brief inline: `/pitch [N] [brief]`. Cheap sub-agents handle codebase and competitor research (with a cited feature matrix); accepted ideas land in a `PITCHES.md` handover dossier with a cross-run ledger. | You invoke `/mella:pitch`, or ask "what should I build next?", "pitch me ideas", "suggest features" |
@@ -50,9 +49,6 @@ It runs entirely through three lifecycle hooks (SessionStart recalls, PreCompact
 **3. Start using:**
 
 ```bash
-# Audit code on current branch
-/mella:audit
-
 # Create commits with intelligent grouping
 /mella:commit group
 
