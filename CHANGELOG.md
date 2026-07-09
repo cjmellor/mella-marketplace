@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.16.0] - 2026-07-09
+
+### Changed
+
+- **`/mella:review-bot` — human-readable PR summary comment** (mella plugin → v1.15.0). The triage comment posted to GitHub no longer uses per-section tables with a bare "Link" column. It now opens with a one-line scoreboard ("Triaged 7 comments — 4 fixed, 2 dismissed, 1 outdated") followed by one prose line per finding, grouped by outcome, with the comment link on the file path. Unresolved flagged items get a "Needs a human" group.
+
 ## [1.15.1] - 2026-07-09
 
 ### Changed
