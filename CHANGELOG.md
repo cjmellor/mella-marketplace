@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.0] - 2026-07-09
+
+### Changed
+
+- **`/mella:commit` — automatic grouping, opinionated PRs, forked execution** (mella plugin → v1.14.0):
+
+  **`group` flag removed.** The skill now decides the commit split itself: one commit by default, multiple only when the changes are clearly unrelated (e.g. a dependency bump alongside an unrelated bug fix). Tests, docs, and config always stay with the feature they belong to.
+
+  **PR titles and descriptions follow a hard standard.** Titles use the same `type(scope):` conventional style as commit subjects. Descriptions are principles-based prose — the *why* and the behavior-level *what*, plus an issue link when one exists — and explicitly ban implementation narration, test narration, follow-ups, process artifacts, and file-by-file lists. `--fill` is gone; the skill composes both itself.
+
+  **`pr` implies `push` and no longer asks.** Passing `pr` is the intent — the skill creates the PR directly (new `draft` token creates it as a draft). An existing PR's title/description are updated only when new commits materially change its scope. On the default branch it stops and reports instead of inventing a branch.
+
+  **Runs cheap and out of context.** New frontmatter pins `model: claude-sonnet-5`, `effort: low`, and `context: fork`, so diff-reading happens in a forked subagent and never populates the main conversation.
+
 ## [1.14.0] - 2026-07-05
 
 ### Changed

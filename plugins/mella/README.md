@@ -6,42 +6,22 @@ Mella's collection of productivity tools for Claude Code.
 
 ### `/mella:commit`
 
-Create git commits with optional intelligent grouping, push, and PR creation.
+Create git commits with automatic logical grouping, optional push, and PR creation. Runs in a forked context (Sonnet on low effort), so diff-reading never pollutes your main conversation.
 
 **Usage:**
 ```bash
-/mella:commit                    # Standard commit (like /commit-commands:commit)
-/mella:commit group              # Analyze changes and create grouped commits
-/mella:commit pr                 # Commit and handle PR (check if exists or ask to create)
+/mella:commit                    # Commit all changes (auto-grouped if genuinely unrelated)
 /mella:commit push               # Commit and push to current branch
 /mella:commit push origin/main   # Commit and push to specific branch
-/mella:commit group pr push      # Combine all options
+/mella:commit pr                 # Commit, push, and create or update a PR
+/mella:commit pr draft           # Same, but a new PR is created as a draft
 ```
 
 **Features:**
-- **Standard mode**: Creates a single commit with all staged/unstaged changes
-- **Grouped mode (`group`)**: Intelligently analyzes changed files and groups them into logical, separate commits
-  - Separates dependency updates from code changes
-  - Groups related files together
-  - Generates descriptive commit messages following commit conventions
-  - Automatically stages unstaged files
-- **PR mode (`pr`)**: Checks if PR exists for current branch, or asks user if they want to create one
-- **Push mode (`push`)**: Pushes commits to remote (current branch or specified branch)
-
-**Example:**
-
-When you have changes to both `package.json`, `composer.json`, and source files like `Controller.php`:
-
-```bash
-/mella:commit group pr push
-```
-
-This will:
-1. Create separate commits:
-   - "Update dependencies" (package.json, composer.json)
-   - "Add authentication to user controller" (Controller.php, Middleware.php)
-2. Push all commits to the remote
-3. Check if a PR exists or ask to create one
+- **Automatic grouping**: Defaults to a single commit; splits into separate commits only when the changes are clearly unrelated (e.g. a dependency bump alongside an unrelated bug fix). Tests, docs, and config always stay with the feature they belong to.
+- **Conventional commits**: `type(scope): subject`, imperative mood, matched to the repo's existing style.
+- **PR mode (`pr`)**: Implies `push`. Creates a PR without asking (add `draft` for a draft PR), composing the title and description itself — the title follows commit-subject conventions, and the description covers *why* and the behavior-level *what*, with no implementation narration, test narration, follow-ups, or process fluff. If a PR already exists, its title/description are only updated when the new commits materially change its scope.
+- **Push mode (`push`)**: Pushes commits to the remote (current branch or specified branch).
 
 ### `/mella:review-bot`
 

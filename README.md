@@ -14,7 +14,7 @@ Productivity tools to streamline your development workflow.
 
 | Skill | Description | Triggers when... |
 |-------|-------------|------------------|
-| `commit` | Create git commits with optional intelligent grouping (`group`), push (`push`), and PR creation (`pr`). Automatically runs Laravel Pint linter if available. | You invoke `/mella:commit` |
+| `commit` | Create git commits with automatic logical grouping, push (`push`), and PR creation (`pr`, `draft`). Runs in a forked context on a cheaper model, and runs Laravel Pint automatically if available. | You invoke `/mella:commit` |
 | `walkthrough` | Auto-generates step-by-step testing guides for features and bug fixes. Runs in an isolated context. | You ask Claude to "write a walkthrough", "create testing steps", or generate QA documentation |
 | `pitch` | Deep-dive codebase analysis that generates innovative ideas one at a time. Pass a count and brief inline: `/pitch [N] [brief]`. Cheap sub-agents handle codebase and competitor research (with a cited feature matrix); accepted ideas land in a `PITCHES.md` handover dossier with a cross-run ledger. | You invoke `/mella:pitch`, or ask "what should I build next?", "pitch me ideas", "suggest features" |
 | `review-bot` | Triage GitHub bot review comments on PRs: re-reviews each comment against the actual code, applies valid fixes, dismisses false positives, and posts a summary comment on the PR. | You invoke `/mella:review-bot`, or say "handle the bot review", "triage bot comments on PR #N" |
@@ -49,11 +49,11 @@ It runs entirely through three lifecycle hooks (SessionStart recalls, PreCompact
 **3. Start using:**
 
 ```bash
-# Create commits with intelligent grouping
-/mella:commit group
+# Create commits (auto-grouped when changes are unrelated)
+/mella:commit
 
-# Create commits, push, and handle PR
-/mella:commit group pr push
+# Create commits, push, and create/update a PR
+/mella:commit pr
 
 # Generate testing walkthroughs
 /mella:walkthrough

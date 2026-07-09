@@ -1,8 +1,11 @@
 ---
 name: commit
-description: Create git commits with optional intelligent grouping, push, and PR creation. Use when committing changes — standard single commit, logically grouped commits, pushing, or creating a PR.
-argument-hint: "[group] [pr] [push [branch]]"
-allowed-tools: [Bash, Read, Grep, Glob, AskUserQuestion]
+description: Create git commits with automatic logical grouping, optional push, and PR creation. Use when committing changes — single or multiple commits, pushing, or creating/updating a PR.
+argument-hint: "[pr] [draft] [push [branch]]"
+allowed-tools: [Bash, Read, Grep, Glob]
+model: claude-sonnet-5
+effort: low
+context: fork
 hooks:
   PreToolUse:
     - matcher: "Bash"
@@ -14,57 +17,71 @@ hooks:
 
 # Commit Command
 
-Create git commits with optional intelligent grouping of changes.
+Create git commits, automatically grouped into logical units, with optional push and PR creation.
 
 ## Usage
 
-- `/mella:commit` — Standard commit
-- `/mella:commit group` — Analyze and group changes into logical commits
-- `/mella:commit pr` — Commit and use existing PR (or ask to create one)
+- `/mella:commit` — Commit all changes (auto-grouped if genuinely unrelated)
 - `/mella:commit push` — Commit and push to current branch
 - `/mella:commit push origin/feature-branch` — Commit and push to specific branch
-- `/mella:commit group pr push` — Combine all options
+- `/mella:commit pr` — Commit, push, and create or update a PR
+- `/mella:commit pr draft` — Same, but a new PR is created as a draft
 
 ## Argument Parsing
 
-Check `$ARGUMENTS` for flags: `group`, `pr`, `push`. For `push`, extract the next token as the target branch if present.
+Check `$ARGUMENTS` for flags: `pr`, `draft`, `push`. For `push`, extract the next token as the target branch if present. `pr` implies `push`; `draft` only has effect alongside `pr`.
 
-## Standard Mode (no arguments)
+## Committing
 
-Run `git status`, `git diff`, and `git log -5 --oneline` to understand changes and commit style. Draft a conventional commit message, stage relevant files with `git add`, commit, then verify with `git status`.
-
-## Grouped Mode (group flag)
-
-1. **Analyze**: `git status` + `git diff HEAD` + Read each changed file.
-2. **Group by semantic purpose**: dependency files, config/build, source (by feature/module), tests, migrations. Aim for 2–5 groups. Group by meaning, not just file type.
-3. **Commit each group**: `git add <files>` → conventional commit message → commit → verify.
-4. **Finish**: Show `git log --oneline -n <N>` and `git status` to confirm all changes committed.
-
-### Example
-
-| Group | Files | Message |
-|---|---|---|
-| Dependencies | `package.json`, `composer.json` | "Update dependencies" |
-| Feature | `src/Controllers/UserController.php`, `src/Middleware/AuthMiddleware.php` | "Add authentication middleware" |
-| Tests | `tests/AuthTest.php` | "Add authentication tests" |
-
-## Pull Request Mode (pr flag)
-
-Run `gh pr view --json number,title,url`:
-- **PR exists**: display URL and title.
-- **No PR**: ask the user whether to create one. If yes, after all commits and push run `gh pr create --fill` and display the new PR URL.
+1. **Analyze**: `git status`, `git diff HEAD`, and `git log -5 --oneline` to understand the changes and the repo's commit style.
+2. **Decide the split**: default to a **single commit**. Split into multiple commits only when the changes contain clearly unrelated sets — e.g. a dependency bump alongside an unrelated bug fix. When in doubt, one commit. Never separate tests, docs, or config from the feature they belong to.
+3. **Commit**: for each unit, `git add <files>` → conventional commit message (`type(scope): subject`, imperative mood) → commit.
+4. **Verify**: `git log --oneline -n <N>` and `git status` to confirm everything is committed.
 
 ## Push Mode (push flag)
 
-After all commits are created, push:
-- Branch specified after `push`: `git push origin HEAD:<branch>`
-- No branch: `git push`
+After all commits are created:
 
-If push fails, explain the error and suggest `git push -u origin <branch>` for new branches.
+- Branch specified after `push`: `git push origin HEAD:<branch>`
+- No branch: `git push` (use `git push -u origin <branch>` if the branch has no upstream)
+
+If push fails, stop and explain the error.
+
+## Pull Request Mode (pr flag)
+
+`pr` implies `push`. If the current branch is the repository's default branch (`main`/`master`), stop and report — do not invent a branch.
+
+Run `gh pr view --json number,title,url,body` to check for an existing PR:
+
+- **No PR**: after committing and pushing, compose the title and description yourself per the standards below and run `gh pr create --title ... --body ...` (add `--draft` if the `draft` flag was given). Never use `--fill`. Display the new PR URL.
+- **PR exists**: push the new commits and display the PR URL. Update the PR's title/description **only if** the new commits materially change what the PR proposes (new behavior, changed scope). A trivial addition — review fixes, a typo, a small follow-through — leaves the existing title and description untouched.
+
+### PR title
+
+The title is the merge commit's subject line. Same rules as commit subjects: `type(scope): subject`, imperative mood, ≤ 70 characters, describing the change itself — not the activity ("feat(auth): add rate limiting to login endpoint", never "Updates and fixes for auth"). If the branch can't be titled in one crisp line, say so — it is doing too many things.
+
+### PR description
+
+The reviewer can already see the diff. The description's only job is what the diff cannot say. Write 2–6 sentences of plain prose (bullets only if there are multiple distinct behavioral changes) covering:
+
+1. **Why** — the problem or goal that motivated the change; the context a reviewer needs before reading code.
+2. **What, at the behavior level** — the user-visible or API-visible effect. Not file-by-file mechanics.
+3. **Only when genuinely present**: breaking changes, deliberate trade-offs, or a non-obvious decision a reviewer would otherwise question.
+4. **Issue link** — `Closes #N` when the change resolves a tracked issue.
+
+Scale to the change: a one-line fix gets a one-line description.
+
+**Never include:**
+
+- How the change was implemented — the diff shows that.
+- Test narration ("ran the tests, all passing") — implied by the PR existing.
+- Follow-ups, future work, or "next steps".
+- Process artifacts: plans, phases, "as discussed", tool or agent mentions.
+- File-by-file change lists.
 
 ## Rules
 
-- Respect staged changes — keep them staged and include in appropriate groups.
+- Respect staged changes — keep them staged and include them in the appropriate commit.
 - Always use conventional commit style (imperative mood).
 - Never use `--amend`, `--force`, or other destructive operations.
-- Stop and explain on commit failure — do not continue with remaining groups.
+- Stop and explain on commit failure — do not continue with remaining commits.
