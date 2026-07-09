@@ -16,7 +16,6 @@ Productivity tools to streamline your development workflow.
 |-------|-------------|------------------|
 | `audit` | Orchestrated code review — runs security, code quality, and PR review skills in parallel, deduplicates findings, and produces a consistent structured report. | You invoke `/mella:audit`, or say "check my changes", "look over my diff", "review before I merge" |
 | `commit` | Create git commits with optional intelligent grouping (`group`), push (`push`), and PR creation (`pr`). Automatically runs Laravel Pint linter if available. | You invoke `/mella:commit` |
-| `competitor-analysis` | Deep competitive intelligence — auto-detects your product, searches the web, visits competitor sites live, and produces a Markdown report or interactive HTML dashboard. | You invoke `/mella:competitor-analysis`, or say "who are our competitors", "run competitor research" |
 | `walkthrough` | Auto-generates step-by-step testing guides for features and bug fixes. Runs in an isolated context. | You ask Claude to "write a walkthrough", "create testing steps", or generate QA documentation |
 | `pitch` | Deep-dive codebase analysis that generates innovative ideas one at a time. Pass a count and brief inline: `/pitch [N] [brief]`. Researches competitors automatically; Y/N/M responses keep Markdown rendered. | You invoke `/mella:pitch`, or ask "what should I build next?", "pitch me ideas", "suggest features" |
 | `review-bot` | Triage GitHub bot review comments on PRs: re-reviews each comment against the actual code, applies valid fixes, dismisses false positives, and posts a summary comment on the PR. | You invoke `/mella:review-bot`, or say "handle the bot review", "triage bot comments on PR #N" |
@@ -65,9 +64,6 @@ It runs entirely through three lifecycle hooks (SessionStart recalls, PreCompact
 
 # Triage bot review comments on a PR
 /mella:review-bot
-
-# Run competitor analysis (produces Markdown report or HTML dashboard)
-/mella:competitor-analysis
 
 # Generate 5 innovative feature ideas (default)
 /mella:pitch

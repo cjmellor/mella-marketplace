@@ -74,31 +74,6 @@ Skills run in parallel (or sequentially with `--sequential`) and their findings 
 - `--force` — allow running on `main`/`master`
 - `--effort <low|medium|high|max>` — passed to `code-review` (default: `high`)
 
-### `/mella:competitor-analysis`
-
-Deep competitive intelligence — auto-detects your product, searches the web, visits competitor sites live, and produces a report.
-
-**Usage:**
-```bash
-/mella:competitor-analysis         # Deep analysis (3–5 competitors, thorough)
-/mella:competitor-analysis wide    # Wide analysis (10+ competitors, lighter coverage)
-/mella:competitor-analysis html    # Output as interactive HTML dashboard
-/mella:competitor-analysis wide html  # Both
-```
-
-**How it works:**
-
-1. Reads project files (`README.md`, `package.json`, source code) to understand what your product does.
-2. Searches the web for competitors from multiple angles (G2, Capterra, Reddit, HN, direct searches).
-3. Visits each competitor's site live — homepage, pricing, features — and mines review sites for honest user signals.
-4. Outputs a structured Markdown report or a self-contained interactive HTML dashboard.
-5. Saves findings to `.claude/competitor-data.yaml` so future runs can offer a delta update instead of a full re-analysis.
-
-**Tips:**
-- Exact hero headline quotes and CTA wording are the whole point of the copy analysis — the skill captures them.
-- Reddit/HN complaints are often more valuable than G2 ratings.
-- If a competitor's pricing is behind a login, the skill notes "not publicly listed" and uses reported pricing from review sites.
-
 ### `/mella:review-bot`
 
 Triage review bot comments on a GitHub PR — re-review, fix, dismiss, and summarise.
