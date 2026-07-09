@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.1] - 2026-07-09
+
+### Changed
+
+- **`/mella:commit` — reliable natural-language triggering** (mella plugin → v1.14.1). The skill description now names the phrasings that should invoke it ("commit", "commit and push", "commit and open a PR"), so saying "commit and push" auto-runs the skill without typing the slash command.
+
 ## [1.15.0] - 2026-07-09
 
 ### Changed

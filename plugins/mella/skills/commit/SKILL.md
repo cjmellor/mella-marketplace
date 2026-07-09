@@ -1,6 +1,6 @@
 ---
 name: commit
-description: Create git commits with automatic logical grouping, optional push, and PR creation. Use when committing changes — single or multiple commits, pushing, or creating/updating a PR.
+description: Create git commits with automatic logical grouping, optional push, and PR creation. Trigger whenever the user asks to commit — e.g. "commit", "commit this", "commit and push", "commit and open a PR", "commit and make a PR" — or otherwise wants to commit, push, or create/update a pull request.
 argument-hint: "[pr] [draft] [push [branch]]"
 allowed-tools: [Bash, Read, Grep, Glob]
 model: claude-sonnet-5
