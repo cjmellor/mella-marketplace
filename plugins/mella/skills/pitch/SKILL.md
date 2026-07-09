@@ -7,9 +7,8 @@ description: >
   "what should I build next?", "pitch me ideas", "what's the smartest thing to add?",
   "innovate on this codebase", "suggest features", or runs /pitch.
   Works on any language, framework, or project type.
-model: opus
 effort: high
-allowed-tools: Read Grep Glob Agent WebSearch
+allowed-tools: Read Grep Glob Agent Write
 ---
 
 # Pitch
@@ -17,9 +16,12 @@ allowed-tools: Read Grep Glob Agent WebSearch
 Analyse a codebase deeply, research the ecosystem, then pitch innovative ideas one at a time.
 Be an opinionated advisor who genuinely believes in the ideas — and an enthusiastic collaborator.
 
+Research is delegated to cheap sub-agents; **your** job is the part that needs intelligence:
+deciding what to pitch. Do not read project files or search the web yourself in Phase 2.
+
 ## Argument Parsing
 
-Parse `` for an optional count and an optional brief:
+Parse `$ARGUMENTS` for an optional count and an optional brief:
 
 - **Count** — a leading integer sets how many pitches to generate (default: **5**)
 - **Brief** — remaining text describes the project context or focus area
@@ -34,13 +36,30 @@ Examples: `/pitch` · `/pitch 10` · `/pitch a wedding website` · `/pitch 10 ad
 1. What is this project and what should the pitches focus on?
 2. Any goals, constraints, or previously rejected ideas?
 
+**Ledger check** — if `PITCHES.md` exists at the repo root, read its Ledger section. It
+records every pitch previously shown and its verdict. Two rules bind Phase 2:
+1. Never re-pitch a **declined** idea — unless the codebase has materially changed in a way
+   that invalidates the recorded rejection reason, and then say so explicitly ("you declined
+   this in May because X; X is no longer true").
+2. A **banked** idea that was never implemented is a legitimate re-pitch, flagged
+   *still on the table*.
+
 ## Phase 2: Research (always runs, before any pitch is shown)
 
-Run in parallel:
-1. **Codebase** — Explore agents: architecture, API surface, tests, deps, docs, DX friction. See [REFERENCE.md](REFERENCE.md).
-2. **Ecosystem** — WebSearch for competitors, similar packages, how the space approaches this problem. Capture positioning, differentiators, and gaps.
+Spawn both plugin agents **in parallel** via the `Agent` tool:
 
-Generate all N ideas internally before showing any. Sequence strongest-first.
+1. **`mella:pitch-scout`** — pass the brief and repo root; it surveys the codebase and
+   returns ranked findings with `file:line` evidence.
+2. **`mella:pitch-researcher`** — pass a self-contained description of the project (from
+   the brief; supplement from the README if the brief is thin); it returns a cited
+   competitor feature matrix and positioning observations.
+
+Both agents return the structured findings defined in [REFERENCE.md](REFERENCE.md). Wait for
+both, then generate all N ideas internally before showing any. Sequence strongest-first.
+
+**Evidence rule:** pitch only from claims that carry a `file:line` citation or a competitor
+source URL. A finding without evidence does not exist. Treat matrix `unknown` cells as
+non-evidence, never as `lacks`.
 
 ## Phase 3: Pitch Loop
 
@@ -51,7 +70,7 @@ After each pitch's Scorecard, append exactly:
 > **What do you think?** Reply **Y** to bank it · **N** to skip · **M** for more detail
 
 - **Y** — record as accepted; move to the next pitch
-- **N** — move to the next pitch
+- **N** — record as declined, with the reason if the user gave one; move to the next pitch
 - **M** — go deeper (API sketch, affected files, tradeoffs); then re-ask Y/N before moving on
 
 After all N pitches are done, use `AskUserQuestion` to ask if they want more ideas.
@@ -62,13 +81,13 @@ After all N pitches are done, use `AskUserQuestion` to ask if they want more ide
 ## Pitch #N: [Catchy Name]
 
 ### The Problem
-[1-2 sentences — specific, references actual code/files/patterns you observed]
+[1-2 sentences — specific, references actual code/files/patterns from the scout's findings]
 
 ### The Solution
 [2-4 sentences — concrete enough to picture; code sketch or API example if helpful]
 
 ### Why This Is the Right Move
-[2-3 sentences — why NOW; connect to goals, ecosystem gaps, competitor positioning]
+[2-3 sentences — why NOW; cite the feature matrix or positioning observations]
 
 ### Scorecard
 | Dimension  | Rating | Notes                        |
@@ -85,10 +104,21 @@ After all N pitches are done, use `AskUserQuestion` to ask if they want more ide
 - **Bold** — aim for "why didn't this exist already?", not incremental tweaks.
 - **Honest** — realistic scorecard; acknowledge effort and risk.
 
-## Phase 4: Wrap-up
+## Phase 4: Wrap-up — the Dossier
 
-List all accepted (Y) ideas as a numbered summary. Offer to write a structured plan for any or all of them. The user decides how to proceed from there.
+When the user is done pitching, write **`PITCHES.md` at the repo root** using the template
+in [REFERENCE.md](REFERENCE.md): one implementation brief per accepted pitch (problem,
+solution, affected files from the scout's evidence, acceptance criteria, tradeoffs —
+including anything surfaced during **M** deep-dives), a one-line appendix entry per declined
+pitch, a suggested implementation order, and the updated Ledger.
+
+If `PITCHES.md` already exists: replace the brief sections with the new run's output, but
+**append** to the Ledger — it is the permanent record and is never rewritten.
+
+The dossier is a handover document — implementation happens elsewhere, by whoever (or
+whatever model) the user hands it to. Do not offer to implement.
 
 ## Tone
 
-Opinionated advisor + enthusiastic collaborator. Have a point of view, get excited, push back thoughtfully. Two senior engineers brainstorming — not a sales pitch.
+Opinionated advisor + enthusiastic collaborator. Have a point of view, get excited, push
+back thoughtfully. Two senior engineers brainstorming — not a sales pitch.
