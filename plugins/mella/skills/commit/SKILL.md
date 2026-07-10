@@ -1,6 +1,6 @@
 ---
 name: commit
-description: Create git commits with automatic logical grouping, optional push, and PR creation. Trigger whenever the user asks to commit — e.g. "commit", "commit this", "commit and push", "commit and open a PR", "commit and make a PR" — or otherwise wants to commit, push, or create/update a pull request.
+description: Create git commits with automatic logical grouping, optional push, and PR creation. Trigger whenever the user asks to commit, push, or create/update a pull request — e.g. "commit", "commit this", "commit and push", "commit and open a PR", "create a PR", "open a pull request", "make a PR for this" — even when everything is already committed and there is nothing new to commit.
 argument-hint: "[pr] [draft] [push [branch]]"
 allowed-tools: [Bash, Read, Grep, Glob]
 model: claude-sonnet-5
@@ -34,6 +34,7 @@ Check `$ARGUMENTS` for flags: `pr`, `draft`, `push`. For `push`, extract the nex
 ## Committing
 
 1. **Analyze**: `git status`, `git diff HEAD`, and `git log -5 --oneline` to understand the changes and the repo's commit style.
+   - **Clean working tree is not an error.** If there is nothing to commit, skip the remaining commit steps. With `push` or `pr`, continue with the branch's existing commits — push mode still pushes, PR mode still creates or updates the PR. Only stop if the tree is clean **and** no flags were given (report that there is nothing to commit).
 2. **Decide the split**: default to a **single commit**. Split into multiple commits only when the changes contain clearly unrelated sets — e.g. a dependency bump alongside an unrelated bug fix. When in doubt, one commit. Never separate tests, docs, or config from the feature they belong to.
 3. **Commit**: for each unit, `git add <files>` → conventional commit message (`type(scope): subject`, imperative mood) → commit.
 4. **Verify**: `git log --oneline -n <N>` and `git status` to confirm everything is committed.
@@ -49,7 +50,7 @@ If push fails, stop and explain the error.
 
 ## Pull Request Mode (pr flag)
 
-`pr` implies `push`. If the current branch is the repository's default branch (`main`/`master`), stop and report — do not invent a branch.
+`pr` implies `push`. If the current branch is the repository's default branch (`main`/`master`), stop and report — do not invent a branch. A clean working tree does not block this mode: if the branch already has unpushed or pushed commits, proceed straight to the PR steps below.
 
 Run `gh pr view --json number,title,url,body` to check for an existing PR:
 
@@ -62,7 +63,7 @@ The title is the merge commit's subject line. Same rules as commit subjects: `ty
 
 ### PR description
 
-The reviewer can already see the diff. The description's only job is what the diff cannot say. Write 2–6 sentences of plain prose (bullets only if there are multiple distinct behavioral changes) covering:
+The reviewer can already see the diff. The description's only job is what the diff cannot say. Write 2–6 sentences of plain prose — no section headings like "Why", "What", "Summary", or "Tests" (bullets only if there are multiple distinct behavioral changes) — covering:
 
 1. **Why** — the problem or goal that motivated the change; the context a reviewer needs before reading code.
 2. **What, at the behavior level** — the user-visible or API-visible effect. Not file-by-file mechanics.
@@ -74,7 +75,7 @@ Scale to the change: a one-line fix gets a one-line description.
 **Never include:**
 
 - How the change was implemented — the diff shows that.
-- Test narration ("ran the tests, all passing") — implied by the PR existing.
+- Tests, in any form: no "Tests"/"Test plan" section, no listing of new or existing test cases, no narration ("ran the tests, all passing") — passing tests are implied by the PR existing.
 - Follow-ups, future work, or "next steps".
 - Process artifacts: plans, phases, "as discussed", tool or agent mentions.
 - File-by-file change lists.
