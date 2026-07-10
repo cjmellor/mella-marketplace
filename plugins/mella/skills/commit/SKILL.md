@@ -5,7 +5,6 @@ argument-hint: "[pr] [draft] [push [branch]]"
 allowed-tools: [Bash, Read, Grep, Glob]
 model: claude-sonnet-5
 effort: low
-context: fork
 hooks:
   PreToolUse:
     - matcher: "Bash"

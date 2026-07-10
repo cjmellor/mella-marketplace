@@ -6,7 +6,7 @@ Mella's collection of productivity tools for Claude Code.
 
 ### `/mella:commit`
 
-Create git commits with automatic logical grouping, optional push, and PR creation. Runs in a forked context (Sonnet on low effort), so diff-reading never pollutes your main conversation.
+Create git commits with automatic logical grouping, optional push, and PR creation. Runs on Sonnet at low effort to keep it cheap.
 
 **Usage:**
 ```bash
