@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.16.1] - 2026-07-10
+
+### Fixed
+
+- **`/mella:commit` — `pr` no longer refuses on a clean working tree** (mella plugin → v1.15.1). Running `/mella:commit pr` right after a plain `/mella:commit` had already committed everything left nothing new to commit, and the skill treated that as a dead end instead of proceeding. A clean tree with `push` or `pr` now skips straight to pushing/opening the PR; the skill also triggers on standalone PR requests ("create a PR", "open a pull request") even with nothing to commit. The PR description rules now ban section headings (Why/What/Tests) and any mention of tests, not just test narration.
+
 ## [1.16.0] - 2026-07-09
 
 ### Changed
