@@ -75,6 +75,10 @@ Deep-dive codebase analysis that generates innovative, high-leverage feature ide
 
 Interactive walkthrough command for documentation and QA.
 
+### `/mella:worktree-setup`
+
+Provision a project so every git worktree Claude Code creates (`--worktree`, EnterWorktree, subagents, background jobs) starts ready to work, then verify it with fresh headless sessions. Covers `.worktreeinclude`, personal settings and plugins in `.claude/settings.local.json`, `worktree.baseRef`, a `SessionStart`/`PostToolUse` hook that clones dependency trees from the main checkout and reconciles them with the package managers, and a local-scope wrapper that holds dependency-backed MCP servers until the hook finishes. Stack recipes: Laravel (verified), Node, Swift for iOS/macOS.
+
 ## Installation
 
 This plugin is part of the mella-marketplace. To use it:

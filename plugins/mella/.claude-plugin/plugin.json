@@ -1,10 +1,10 @@
 {
   "name": "mella",
-  "version": "1.15.2",
+  "version": "1.16.0",
   "description": "Mella's collection of productivity tools for Claude Code",
   "author": {
     "name": "Chris"
   },
-  "keywords": ["testing", "walkthrough", "documentation", "qa", "code-review", "review", "review-bot", "pitch", "ideation"],
+  "keywords": ["testing", "walkthrough", "documentation", "qa", "code-review", "review", "review-bot", "pitch", "ideation", "worktree", "provisioning"],
   "license": "MIT"
 }

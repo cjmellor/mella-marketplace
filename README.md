@@ -18,6 +18,7 @@ Productivity tools to streamline your development workflow.
 | `walkthrough` | Auto-generates step-by-step testing guides for features and bug fixes. Runs in an isolated context. | You ask Claude to "write a walkthrough", "create testing steps", or generate QA documentation |
 | `pitch` | Deep-dive codebase analysis that generates innovative ideas one at a time. Pass a count and brief inline: `/pitch [N] [brief]`. Cheap sub-agents handle codebase and competitor research (with a cited feature matrix); accepted ideas land in a `PITCHES.md` handover dossier with a cross-run ledger. | You invoke `/mella:pitch`, or ask "what should I build next?", "pitch me ideas", "suggest features" |
 | `review-bot` | Triage GitHub bot review comments on PRs: re-reviews each comment against the actual code, applies valid fixes, dismisses false positives, and posts a summary comment on the PR. | You invoke `/mella:review-bot`, or say "handle the bot review", "triage bot comments on PR #N" |
+| `worktree-setup` | Provisions a project so every new git worktree starts ready to work: copies gitignored config, clones dependencies from the main checkout, carries plugins and the branch base over, and holds project MCP servers until dependencies exist. Stack recipes for Laravel, Node and Swift. | You invoke `/mella:worktree-setup`, or say "set up worktrees for this project", or a worktree is missing files, dependencies, plugins or MCP servers |
 
 ### grain
 
@@ -60,6 +61,9 @@ It runs entirely through three lifecycle hooks (SessionStart recalls, PreCompact
 
 # Triage bot review comments on a PR
 /mella:review-bot
+
+# Make new worktrees start with config, dependencies, plugins and MCP servers
+/mella:worktree-setup
 
 # Generate 5 innovative feature ideas (default)
 /mella:pitch

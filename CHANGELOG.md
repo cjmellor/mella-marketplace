@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.17.0] - 2026-09-27
+
+### Added
+
+- **`/mella:worktree-setup`** (mella plugin → v1.16.0). Provisions a project so every new git worktree starts with the main checkout's config, dependencies, plugins, MCP servers and branch base, then verifies it with fresh headless sessions. Ships a provisioning hook and an MCP wait wrapper as templates, plus stack recipes for Laravel, Node and Swift.
+
 ## [1.16.2] - 2026-07-10
 
 ### Fixed
