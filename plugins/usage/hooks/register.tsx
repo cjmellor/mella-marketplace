@@ -26,8 +26,6 @@ const TICK_MS = 60_000
 type Level = 'green' | 'yellow' | 'red'
 
 let ticker: { cancel: () => void } | undefined
-let activeTurn: string | undefined
-
 export const prettyModel = (id: string): string => {
   const match = /^claude-([a-z]+)-(\d+)(?:-(\d{1,2}))?(?!\d)/.exec(id)
 
@@ -219,15 +217,8 @@ export const register: Register = on => {
     return next(e)
   })
 
-  on('turn.start', async (_$, e, next) => {
-    const started = await next(e)
-    activeTurn = started.turnId
-
-    return started
-  })
-
   on('turn.step', async function* ($, e, next) {
-    if (!e.agentId && e.index === 0 && e.turnId === activeTurn) {
+    if (!e.agentId) {
       await update($, effort, () => e.effort ?? null)
     }
 
