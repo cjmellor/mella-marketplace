@@ -12,8 +12,6 @@ const now = atom({ plugin: 'usage', key: 'now' } as const, 0)
 const totals = atom({ plugin: 'usage', key: 'totals' } as const, emptyTotals)
 const effort = atom({ plugin: 'usage', key: 'effort' } as const, null)
 
-const EFFORT_COLOR = '#e8a05c'
-
 const EFFORT_ICONS: Record<string, string> = { low: '○', medium: '◐', high: '●', xhigh: '◉', max: '◈' }
 
 export const effortIcon = (level: string | number | null): string =>
@@ -28,6 +26,7 @@ const TICK_MS = 60_000
 type Level = 'green' | 'yellow' | 'red'
 
 let ticker: { cancel: () => void } | undefined
+let activeTurn: string | undefined
 
 export const prettyModel = (id: string): string => {
   const match = /^claude-([a-z]+)-(\d+)(?:-(\d{1,2}))?(?!\d)/.exec(id)
@@ -220,8 +219,15 @@ export const register: Register = on => {
     return next(e)
   })
 
+  on('turn.start', async (_$, e, next) => {
+    const started = await next(e)
+    activeTurn = started.turnId
+
+    return started
+  })
+
   on('turn.step', async function* ($, e, next) {
-    if (!e.agentId) {
+    if (!e.agentId && e.index === 0 && e.turnId === activeTurn) {
       await update($, effort, () => e.effort ?? null)
     }
 
@@ -255,7 +261,7 @@ export const register: Register = on => {
     const band = (
       <Box>
         <Text bold>{prettyModel(current.model)}</Text>
-        {icon && <Text color={EFFORT_COLOR}>{` ${icon}`}</Text>}
+        {icon && <Text>{` ${icon}`}</Text>}
         <Text>  </Text>
         {squares(Text, current.percent, BAR_CELLS)}
         <Text color={current.percent === null ? undefined : levelColor(current.percent)} dimColor={current.percent === null}>
@@ -319,7 +325,7 @@ export const register: Register = on => {
         <Box>
           <Text bold>Usage  </Text>
           <Text dimColor>{prettyModel(current.model)}  </Text>
-          {level !== null && <Text color={EFFORT_COLOR}>{`${effortIcon(level)} ${level}  `}</Text>}
+          {level !== null && <Text>{`${effortIcon(level)} ${level}  `}</Text>}
           <Button key="refresh" label="Refresh (r)" hotkey="r" onPress={() => loadBreakdown($)} />
         </Box>
         <Text> </Text>
