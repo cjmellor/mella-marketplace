@@ -2,7 +2,7 @@
   "name": "git-diff",
   "version": "0.1.0",
   "description": "Shows uncommitted git changes above the prompt: files changed, lines added (green) and removed (red), with a GitHub-style bar.",
-  "author": { "name": "Chris" },
+  "author": { "name": "Chris Mellor" },
   "keywords": ["git", "diff", "mod", "statusline"],
   "license": "MIT",
   "types": "./types/index.d.ts"
