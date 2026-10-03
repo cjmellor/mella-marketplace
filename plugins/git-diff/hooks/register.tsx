@@ -209,17 +209,18 @@ export const register: Register = on => {
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    const other = await next(e)
     const current = await read($, stat)
 
     if (e.props.hasSurvey || current === null || current.files === 0) {
-      return next(e)
+      return other
     }
 
     const { Box, Button, Text } = $.ui.resolve(e)
     const squares = barSquares(current)
     const paneIsOpen = await read($, isOpen)
 
-    return (
+    const band = (
       <Box>
         <Text dimColor>± {current.files} {current.files === 1 ? 'file' : 'files'}  </Text>
         <Text color="green" bold>+{current.added}</Text>
@@ -238,6 +239,15 @@ export const register: Register = on => {
           onPress={() => togglePane($)}
         />
       </Box>
+    )
+
+    return other ? (
+      <Box flexDirection="column">
+        {band}
+        {other}
+      </Box>
+    ) : (
+      band
     )
   })
 

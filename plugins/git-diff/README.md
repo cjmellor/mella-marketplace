@@ -82,6 +82,9 @@ does not validate` line.
 
 ## Limits
 
+- Only one hook can draw the band. This mod asks the hooks beneath it for their
+  tree and stacks its own row on top, so it sits alongside other band mods that
+  do the same. A mod that draws without asking replaces it.
 - Only the first 100 untracked files are counted.
 - The pane is a snapshot taken when it opens; it does not update while open.
 - A hot reload of the mod closes an open pane.
