@@ -24,6 +24,14 @@
       "version": "0.1.0",
       "keywords": ["memory", "recall", "context", "session", "persistence", "brain"],
       "license": "MIT"
+    },
+    {
+      "name": "git-diff",
+      "source": "./plugins/git-diff",
+      "description": "A mod that shows uncommitted git changes above the prompt: files changed, green added and red removed counts, and a GitHub-style bar.",
+      "version": "0.1.0",
+      "keywords": ["git", "diff", "mod", "statusline"],
+      "license": "MIT"
     }
   ]
 }
