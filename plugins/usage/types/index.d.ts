@@ -7,10 +7,18 @@ export type Snapshot = {
   limits: Limit[]
   usd: number | null
 }
-export type Category = { name: string; tokens: number; kind: 'used' | 'free' | 'buffer' | 'deferred' }
+export type Totals = {
+  input: number
+  output: number
+  cacheRead: number
+  cacheWrite: number
+  turnMs: number
+  byModel: Record<string, number>
+}
+export type Category ={ name: string; tokens: number; kind: 'used' | 'free' | 'buffer' | 'deferred' }
 
 declare module 'claude-code' {
   interface PluginState {
-    usage: { snapshot: Snapshot | null; breakdown: Category[]; isOpen: boolean; now: number }
+    usage: { snapshot: Snapshot | null; breakdown: Category[]; isOpen: boolean; now: number; totals: Totals }
   }
 }

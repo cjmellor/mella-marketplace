@@ -30,10 +30,18 @@ The band is hidden while a survey is up.
 
 Open it with the `+` button or `/usage`.
 
-- The model and the session cost.
-- Context and each rate-limit window as a 20-square bar, with reset countdowns.
-- The context window by category (system prompt, tools, messages, free space),
+- The model, context fill and each rate-limit window as a 20-square bar, with
+  reset countdowns. Session (`5h`) and weekly windows show as `Session limit` and
+  `Weekly · all models`; a per-model weekly window the engine reports, such as
+  Fable, shows as `Weekly · <model>`, and as `W <model>` in the band.
+- **This session:** cost, turn time, cache hit and each model's share of tokens.
+- **Breakdown:** input, output, cache read and cache write tokens.
+- **Context window:** by category (system prompt, tools, messages, free space),
   largest first, estimated locally.
+
+The session figures add up the turns finished since the mod loaded. A reload
+keeps them, `/clear` does not reset them, and "Turns" is the wall-clock time
+of finished turns, not the API's own time.
 
 `r` refreshes. `Esc` hands the keyboard back and closes the pane.
 
