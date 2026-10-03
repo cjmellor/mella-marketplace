@@ -255,7 +255,7 @@ export const register: Register = on => {
     const band = (
       <Box>
         <Text bold>{prettyModel(current.model)}</Text>
-        {icon && <Text color={EFFORT_COLOR}>{`  ${icon}`}</Text>}
+        {icon && <Text color={EFFORT_COLOR}>{` ${icon}`}</Text>}
         <Text>  </Text>
         {squares(Text, current.percent, BAR_CELLS)}
         <Text color={current.percent === null ? undefined : levelColor(current.percent)} dimColor={current.percent === null}>
