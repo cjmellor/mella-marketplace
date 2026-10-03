@@ -10,6 +10,12 @@ const breakdown = atom({ plugin: 'usage', key: 'breakdown' } as const, [] as Cat
 const isOpen = atom({ plugin: 'usage', key: 'isOpen' } as const, false)
 const now = atom({ plugin: 'usage', key: 'now' } as const, 0)
 const totals = atom({ plugin: 'usage', key: 'totals' } as const, emptyTotals)
+const effort = atom({ plugin: 'usage', key: 'effort' } as const, null)
+
+const EFFORT_ICONS: Record<string, string> = { low: '○', medium: '◐', high: '●', xhigh: '◉', max: '◈' }
+
+export const effortIcon = (level: string | number | null): string =>
+  level === null ? '' : (EFFORT_ICONS[String(level)] ?? String(level))
 
 const BAR_CELLS = 5
 const PANE_BAR_CELLS = 20
@@ -212,6 +218,14 @@ export const register: Register = on => {
     return next(e)
   })
 
+  on('turn.step', async function* ($, e, next) {
+    if (!e.agentId) {
+      await update($, effort, () => e.effort ?? null)
+    }
+
+    yield* next(e)
+  })
+
   on('turn.complete', async ($, e, next) => {
     if (e.usage) {
       const usage = e.usage
@@ -234,10 +248,12 @@ export const register: Register = on => {
     const { Box, Button, Text } = $.ui.resolve(e)
     const at = await read($, now)
     const paneIsOpen = await read($, isOpen)
+    const icon = effortIcon(await read($, effort))
 
     const band = (
       <Box>
         <Text bold>{prettyModel(current.model)}</Text>
+        {icon && <Text dimColor>{` ${icon}`}</Text>}
         <Text>  </Text>
         {squares(Text, current.percent, BAR_CELLS)}
         <Text color={current.percent === null ? undefined : levelColor(current.percent)} dimColor={current.percent === null}>
@@ -275,6 +291,7 @@ export const register: Register = on => {
     const categories = await read($, breakdown)
     const spent = await read($, totals)
     const at = await read($, now)
+    const level = await read($, effort)
 
     if (current === null) {
       return <Text dimColor>No usage reading yet.</Text>
@@ -300,6 +317,7 @@ export const register: Register = on => {
         <Box>
           <Text bold>Usage  </Text>
           <Text dimColor>{prettyModel(current.model)}  </Text>
+          {level !== null && <Text dimColor>{`${effortIcon(level)} ${level}  `}</Text>}
           <Button key="refresh" label="Refresh (r)" hotkey="r" onPress={() => loadBreakdown($)} />
         </Box>
         <Text> </Text>

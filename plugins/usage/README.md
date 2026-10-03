@@ -15,7 +15,11 @@ Shown above the prompt:
 Sonnet 5.5  ◼◼◼◼◼ 12%  5h 8% (34m)  W 13% (4d 2h)  +
 ```
 
-- The model, as `/model` shows it.
+- The model, as `/model` shows it, then an icon for the reasoning effort:
+  `○` low, `◐` medium, `●` high, `◉` xhigh, `◈` max (a number if the effort is
+  a token budget). It is read from each request, so it appears after the first
+  turn and a `/effort` change shows from the next one. Models without an effort
+  setting show no icon.
 - A five-square bar and percentage for the context window.
 - Each rate-limit window (`5h`, `W`) with its percentage and the time until it
   resets. Windows appear once the first response has reported them, and only on

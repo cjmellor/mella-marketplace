@@ -19,6 +19,13 @@ export type Category ={ name: string; tokens: number; kind: 'used' | 'free' | 'b
 
 declare module 'claude-code' {
   interface PluginState {
-    usage: { snapshot: Snapshot | null; breakdown: Category[]; isOpen: boolean; now: number; totals: Totals }
+    usage: {
+      snapshot: Snapshot | null
+      breakdown: Category[]
+      isOpen: boolean
+      now: number
+      totals: Totals
+      effort: string | number | null
+    }
   }
 }

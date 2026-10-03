@@ -4,6 +4,7 @@ import {
   addTurn,
   cacheHit,
   countdown,
+  effortIcon,
   fillCells,
   formatDuration,
   levelColor,
@@ -46,6 +47,12 @@ test('per-model weekly windows get their own titles and labels', () => {
   expect(limitTitle('seven_day')).toBe('Weekly · all models')
   expect(limitTitle('seven_day_fable')).toBe('Weekly · Fable')
   expect(limitLabel('seven_day_fable')).toBe('W Fable')
+})
+
+test('effort levels map to icons, numbers and nothing', () => {
+  expect(['low', 'medium', 'high', 'xhigh', 'max'].map(effortIcon)).toEqual(['○', '◐', '●', '◉', '◈'])
+  expect(effortIcon(8000)).toBe('8000')
+  expect(effortIcon(null)).toBe('')
 })
 
 test('durations read as hours, minutes or seconds', () => {
