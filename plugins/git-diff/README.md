@@ -19,11 +19,13 @@ Shown above the prompt whenever the working tree has changes:
 
 - Files changed, lines added (green) and removed (red).
 - Five squares split by the share of added lines, like GitHub's diff stat.
-- The button on the right shows `+` while the pane is closed and `−` while it is
+- The current branch (a Nerd Font branch icon, `U+E725`, then the name, or the short hash on a detached HEAD) sits at the
+  far right of the row.
+- The button after the squares shows `+` while the pane is closed and `−` while it is
   open. Press it to open or close the pane.
 
-The band is hidden when there are no changes, outside a git repository, and
-while a survey is up.
+With no changes the band shows only the branch, at the right. It is hidden
+outside a git repository and while a survey is up.
 
 ## The pane
 

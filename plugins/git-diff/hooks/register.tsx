@@ -1,5 +1,5 @@
+import type { EngineInterface, Register, RenderChildren } from 'claude-code'
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register } from 'claude-code'
 
 import type { DiffStat, FileStat, ViewMode } from '../types'
 
@@ -9,6 +9,9 @@ type Node = { name: string; children: Map<string, Node>; file?: FileStat }
 const stat = atom({ plugin: 'git-diff', key: 'stat' } as const, null)
 const view = atom({ plugin: 'git-diff', key: 'view' } as const, 'list' as ViewMode)
 const isOpen = atom({ plugin: 'git-diff', key: 'isOpen' } as const, false)
+const branch = atom({ plugin: 'git-diff', key: 'branch' } as const, null)
+
+const RIGHT_GUTTER = 4
 
 const BAR_CELLS = 5
 const PANE = 'changes'
@@ -138,7 +141,22 @@ export const barSquares = (
   return [...Array(green).fill('green'), ...Array(red).fill('red'), ...Array(grey).fill('grey')]
 }
 
+async function currentBranch($: EngineInterface): Promise<string | null> {
+  const named = await $.process.run(['git', 'branch', '--show-current'])
+  const name = named.stdout.trim()
+
+  if (name) {
+    return name
+  }
+
+  const detached = await $.process.run(['git', 'rev-parse', '--short', 'HEAD'])
+
+  return detached.exitCode === 0 ? detached.stdout.trim() : null
+}
+
 async function refresh($: EngineInterface) {
+  const name = await currentBranch($)
+  await update($, branch, () => name)
   const tracked = await $.process.run(['git', 'diff', 'HEAD', '--numstat'])
   const untracked = tracked.exitCode === 0 ? await untrackedNumstat($) : ''
   await update($, stat, () => (tracked.exitCode === 0 ? parseNumstat(`${tracked.stdout}\n${untracked}`) : null))
@@ -212,43 +230,50 @@ export const register: Register = on => {
     const other = await next(e)
     const current = await read($, stat)
 
-    if (e.props.hasSurvey || current === null || current.files === 0) {
+    if (e.props.hasSurvey) {
       return other
     }
 
     const { Box, Button, Text } = $.ui.resolve(e)
+    const name = await read($, branch)
+    const stack = <T extends RenderChildren>(band: T) => (other ? <Box flexDirection="column">{band}{other}</Box> : band)
+
+    if (current === null || current.files === 0) {
+      return name ? stack(
+        <Box width={e.props.bodyColumns - RIGHT_GUTTER} justifyContent="flex-end">
+          <Text dimColor>{` ${name}`}</Text>
+        </Box>,
+      ) : other
+    }
+
     const squares = barSquares(current)
     const paneIsOpen = await read($, isOpen)
 
     const band = (
-      <Box>
-        <Text dimColor>± {current.files} {current.files === 1 ? 'file' : 'files'}  </Text>
-        <Text color="green" bold>+{current.added}</Text>
-        <Text> </Text>
-        <Text color="red" bold>−{current.removed}</Text>
-        <Text>  </Text>
-        {squares.map(color => (
-          <Text color={color === 'grey' ? undefined : color} dimColor={color === 'grey'}>◼</Text>
-        ))}
-        <Text>  </Text>
-        <Button
-          key="toggle"
-          label={paneIsOpen ? '−' : '+'}
-          plain
-          dimColor
-          onPress={() => togglePane($)}
-        />
+      <Box width={e.props.bodyColumns - RIGHT_GUTTER} justifyContent="space-between">
+        <Box>
+          <Text dimColor>{`± ${current.files} ${current.files === 1 ? 'file' : 'files'}  `}</Text>
+          <Text color="green" bold>+{current.added}</Text>
+          <Text> </Text>
+          <Text color="red" bold>−{current.removed}</Text>
+          <Text>  </Text>
+          {squares.map(color => (
+            <Text color={color === 'grey' ? undefined : color} dimColor={color === 'grey'}>◼</Text>
+          ))}
+          <Text>  </Text>
+          <Button
+            key="toggle"
+            label={paneIsOpen ? '−' : '+'}
+            plain
+            dimColor
+            onPress={() => togglePane($)}
+          />
+        </Box>
+        {name && <Text dimColor>{` ${name}`}</Text>}
       </Box>
     )
 
-    return other ? (
-      <Box flexDirection="column">
-        {band}
-        {other}
-      </Box>
-    ) : (
-      band
-    )
+    return stack(band)
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {

@@ -4,6 +4,6 @@ export type ViewMode = 'list' | 'tree'
 
 declare module 'claude-code' {
   interface PluginState {
-    'git-diff': { stat: DiffStat | null; view: ViewMode; isOpen: boolean }
+    'git-diff': { stat: DiffStat | null; view: ViewMode; isOpen: boolean; branch: string | null }
   }
 }
