@@ -186,19 +186,21 @@ function squares(Text: TextElement, percent: number | null, cells: number) {
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
-    await $.command.register({ name: 'usage', description: 'Show context and rate-limit usage in a pane' })
     await update($, isOpen, () => false)
     await refresh($)
     ticker?.cancel()
     ticker = await $.clock.every(TICK_MS, () => tick($))
+    await $.command
+      .register({ name: 'session-stats', description: 'Show model, effort and usage in a pane' })
+      .catch(() => undefined)
 
     return next(e)
   })
 
-  on('command.run', { command: 'usage' }, async $ => {
+  on('command.run', { command: 'session-stats' }, async $ => {
     await openPane($)
 
-    return { text: 'Usage pane opened.' }
+    return { text: 'Session stats pane opened.' }
   })
 
   on('ui.close', async ($, e, next) => {

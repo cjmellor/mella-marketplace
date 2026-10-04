@@ -32,7 +32,7 @@ The band is hidden while a survey is up.
 
 ## The pane
 
-Open it with the `+` button or `/usage`.
+Open it with the `+` button or `/session-stats`.
 
 - The model, context fill and each rate-limit window as a 20-square bar, with
   reset countdowns. Session (`5h`) and weekly windows show as `Session limit` and
