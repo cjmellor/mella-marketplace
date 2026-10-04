@@ -5,12 +5,12 @@ import type { Category, Snapshot, Totals } from '../types'
 
 const emptyTotals: Totals = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, turnMs: 0, byModel: {} }
 
-const snapshot = atom({ plugin: 'usage', key: 'snapshot' } as const, null)
-const breakdown = atom({ plugin: 'usage', key: 'breakdown' } as const, [] as Category[])
-const isOpen = atom({ plugin: 'usage', key: 'isOpen' } as const, false)
-const now = atom({ plugin: 'usage', key: 'now' } as const, 0)
-const totals = atom({ plugin: 'usage', key: 'totals' } as const, emptyTotals)
-const effort = atom({ plugin: 'usage', key: 'effort' } as const, null)
+const snapshot = atom({ plugin: 'session-stats', key: 'snapshot' } as const, null)
+const breakdown = atom({ plugin: 'session-stats', key: 'breakdown' } as const, [] as Category[])
+const isOpen = atom({ plugin: 'session-stats', key: 'isOpen' } as const, false)
+const now = atom({ plugin: 'session-stats', key: 'now' } as const, 0)
+const totals = atom({ plugin: 'session-stats', key: 'totals' } as const, emptyTotals)
+const effort = atom({ plugin: 'session-stats', key: 'effort' } as const, null)
 
 const EFFORT_ICONS: Record<string, string> = { low: '○', medium: '◐', high: '●', xhigh: '◉', max: '◈' }
 

@@ -34,8 +34,8 @@
       "license": "MIT"
     },
     {
-      "name": "usage",
-      "source": "./plugins/usage",
+      "name": "session-stats",
+      "source": "./plugins/session-stats",
       "description": "A Claude Code mod that shows the model, context fill and rate-limit usage above the prompt, with a pane that breaks the context window down.",
       "version": "0.1.0",
       "keywords": ["usage", "context", "rate-limit", "mod", "statusline"],

@@ -19,7 +19,7 @@ export type Category ={ name: string; tokens: number; kind: 'used' | 'free' | 'b
 
 declare module 'claude-code' {
   interface PluginState {
-    usage: {
+    'session-stats': {
       snapshot: Snapshot | null
       breakdown: Category[]
       isOpen: boolean

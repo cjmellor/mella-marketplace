@@ -1,4 +1,4 @@
-# usage
+# session-stats
 
 A Claude Code **mod** that keeps the model, context fill and rate-limit usage in
 view, so you can drop a `statusline` script for them.
@@ -58,21 +58,21 @@ window moves a whole point. Reset countdowns tick once a minute.
 
 ```bash
 /plugin marketplace add cjmellor/mella-marketplace
-/plugin install usage@mella-marketplace
+/plugin install session-stats@mella-marketplace
 /reload-plugins
 ```
 
 To try it from a checkout without installing:
 
 ```bash
-claude --plugin-dir plugins/usage
+claude --plugin-dir plugins/session-stats
 ```
 
 ## Develop
 
 ```bash
-claude plugin validate plugins/usage
-claude plugin test plugins/usage
+claude plugin validate plugins/session-stats
+claude plugin test plugins/session-stats
 ```
 
 `validate` does not check what the band draws: an invalid render tree is dropped

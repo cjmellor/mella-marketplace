@@ -33,10 +33,10 @@ Mods are plugins that put live UI inside Claude Code: a band above the prompt, a
 | Mod | What it does | Open it with |
 |-----|--------------|--------------|
 | `git-diff` | Keeps uncommitted changes in view: a band above the prompt shows files changed, lines added and removed and the current branch, and a pane lists every changed file as a flat list or a folder tree. | `/git-diff`, or the `+` button on the band |
-| `usage` | Shows the model, reasoning effort, context fill and rate-limit usage above the prompt, so you can drop a `statusline` script for them. The pane breaks the context window down. | `/session-stats`, or the `+` button on the band |
+| `session-stats` | Shows the model, reasoning effort, context fill and rate-limit usage above the prompt, so you can drop a `statusline` script for them. The pane breaks the context window down. | `/session-stats`, or the `+` button on the band |
 | `artisan-dev` | Runs a Laravel app's `php artisan dev` from inside the session: per-process logs, restart and stop controls, a port override, site and tunnel links, and server state you can attach to your next prompt. | `/dev` |
 
-See each mod's README for details: [`git-diff`](plugins/git-diff/README.md), [`usage`](plugins/usage/README.md), [`artisan-dev`](plugins/artisan-dev/README.md).
+See each mod's README for details: [`git-diff`](plugins/git-diff/README.md), [`session-stats`](plugins/session-stats/README.md), [`artisan-dev`](plugins/artisan-dev/README.md).
 
 ## Installation
 
@@ -60,7 +60,7 @@ See each mod's README for details: [`git-diff`](plugins/git-diff/README.md), [`u
 
 # Or any of the mods
 /plugin install git-diff@mella-marketplace
-/plugin install usage@mella-marketplace
+/plugin install session-stats@mella-marketplace
 /plugin install artisan-dev@mella-marketplace
 ```
 
