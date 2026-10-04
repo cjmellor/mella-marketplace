@@ -22,7 +22,7 @@ artisan-dev is a Claude Code mod. `/dev` starts every process `php artisan dev` 
 | `/dev restart [name]` | Restart everything, or one process by name or number |
 | `/dev status` | Show what is running |
 | `/dev site` | Open the site |
-| `/dev ask [name]` | Put the server state and recent output in the prompt |
+| `/dev ask [name]` | Attach the server state and recent output to your next prompt |
 | `/dev clear` | Clear the log |
 | `/dev errors` | Toggle showing only errors and warnings |
 | `/dev copy [name]` | Copy a process log (or the all view) to the clipboard |
@@ -42,7 +42,7 @@ The site opens at `APP_URL` from `.env`. A loopback `APP_URL` (`localhost` or `1
 ### The pane
 
 - **Processes** — `0` shows the combined log in arrival order; `1`–`9` pick a process. The up and down arrows move between process names only.
-- **Toolbar** — `x` Stop all (or `s` Start all), `r` Restart all, `t` Restart one (the selected process), `o` Open site, `u` Copy tunnel (shown once a tunnel URL is known), `c` Copy log, `a` Ask Claude.
+- **Toolbar** — `x` Stop all (or `s` Start all), `r` Restart all, `t` Restart one (the selected process), `o` Open site, `u` Copy tunnel (shown once a tunnel URL is known), `c` Copy log, `a` Ask Claude (attaches the state and recent output to your next prompt; the button then reads `asked ✓` and drops it).
 - **Log** — keeps each process's own colours, wraps long lines, and scrolls with the wheel, page keys, Home and End. `e` (or the button in the Log divider) shows only errors and warnings.
 - **Band above the prompt** — status dot, a clickable `:PORT ↗` link that opens the site, how many processes are up, and an error count. `+` and `−` open and close the pane.
 

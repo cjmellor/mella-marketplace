@@ -50,6 +50,7 @@ declare module 'claude-code' {
       back: number
       onlyErrors: boolean
       tunnel: { label: string; url: string } | null
+      attached: { label: string | null; text: string } | null
     }
   }
 }

@@ -5,6 +5,7 @@ import type { Dev, DevEvent, Entry, Proc } from '../types'
 
 const DEFAULT_PORT = 8000
 const PANE = 'dev'
+const PLUGIN = 'artisan-dev'
 const PANE_ROWS = 28
 const MAX_LINES = 300
 const MAX_FEED = 600
@@ -50,6 +51,7 @@ const detected = atom({ plugin: 'artisan-dev', key: 'detected' } as const, null)
 const scrollBack = atom({ plugin: 'artisan-dev', key: 'back' } as const, 0)
 const onlyErrors = atom({ plugin: 'artisan-dev', key: 'onlyErrors' } as const, false)
 const tunnel = atom({ plugin: 'artisan-dev', key: 'tunnel' } as const, null)
+const attached = atom({ plugin: 'artisan-dev', key: 'attached' } as const, null)
 
 const WHEEL_STEP = 3
 
@@ -132,7 +134,7 @@ export const DEV_HELP = [
   '/dev restart [name]    restart everything, or one process by name or number',
   '/dev status            show what is running',
   '/dev site              open the site',
-  '/dev ask [name]        put the latest output in the prompt',
+  '/dev ask [name]        attach the state and latest output to your next prompt',
   '/dev clear             clear the log',
   '/dev errors            toggle showing only errors and warnings in the log',
   '/dev copy [name]       copy a process log (or the all view) to the clipboard',
@@ -634,7 +636,7 @@ export const promptText = (name: string, current: Dev, label: string | null, sta
   const body = logBlock(current, label)
   const log = body ? `\n\n\`\`\`\n${body}\n\`\`\`` : ''
 
-  return `This is the state and latest output of \`php artisan dev\` in ${name}. What is going wrong and how do I fix it?\n\n${status}${log}\n`
+  return `State and latest output of \`php artisan dev\` in ${name}.\n\n${status}${log}\n`
 }
 
 export type ProcSpec = { label: string; command: string; color: string }
@@ -1248,7 +1250,12 @@ async function openUrl($: EngineInterface, url: string) {
   await $.process.run(['open', url])
 }
 
-async function askClaude($: EngineInterface, forced: string | null = null): Promise<boolean> {
+async function dropAttached($: EngineInterface) {
+  await update($, attached, () => null)
+  $.ui.status(undefined)
+}
+
+async function attachContext($: EngineInterface, forced: string | null = null): Promise<boolean> {
   const current = await read($, dev)
 
   if (current.procs.length === 0) {
@@ -1262,10 +1269,21 @@ async function askClaude($: EngineInterface, forced: string | null = null): Prom
   const port = effectivePort(await readPorts($))
   const status = statusText(project.name, current, port, siteUrl(await read($, appUrl), port), await $.clock.now())
 
-  await $.prompt.fill({ text: promptText(project.name, current, label, status), mode: 'insert' })
-  $.ui.toast('State and output added to the prompt')
+  await update($, attached, () => ({ label, text: promptText(project.name, current, label, status) }))
+  $.ui.status(`${PLUGIN}: ${label ?? 'server state'} rides your next prompt (press asked ✓ to drop it)`)
 
   return true
+}
+
+async function toggleAttached($: EngineInterface) {
+  if (await read($, attached)) {
+    await dropAttached($)
+    $.ui.toast('Dropped — nothing will ride your next prompt')
+
+    return
+  }
+
+  await attachContext($)
 }
 
 export const noProcess = (target: string, names: string): string =>
@@ -1321,7 +1339,7 @@ async function runDev($: EngineInterface, args: DevArgs): Promise<string> {
   }
 
   if (args.action === 'ask') {
-    return (await askClaude($, label)) ? 'State and output added to the prompt.' : 'Nothing is running.'
+    return (await attachContext($, label)) ? 'State and output will ride your next prompt.' : 'Nothing is running.'
   }
 
   const wasRunning = anyActive()
@@ -1558,6 +1576,7 @@ export const register: Register = (on, options) => {
     await update($, isOpen, () => false)
     tick?.cancel()
     tick = null
+    await dropAttached($)
     ensureTick($)
 
     return next(e)
@@ -1569,6 +1588,18 @@ export const register: Register = (on, options) => {
     await releaseAll($, Math.max(0, Math.min(TERM_GRACE_MS, next.budget.remainingMs - 500)))
 
     return next(e)
+  })
+
+  on('prompt.submit', async ($, e, next) => {
+    const held = await read($, attached)
+
+    if (!held) {
+      return next(e)
+    }
+
+    await dropAttached($)
+
+    return next({ ...e, context: [...(e.context ?? []), held.text] })
   })
 
   on('command.run', { command: 'dev' }, async ($, e) => {
@@ -1676,6 +1707,7 @@ export const register: Register = (on, options) => {
     )
     const isFiltered = await read($, onlyErrors)
     const found = await read($, tunnel)
+    const isAttached = (await read($, attached)) !== null
     const entries = visibleEntries(current, pick, isFiltered)
     const filterLabel = isFiltered ? 'Errors only ✓' : 'Errors only'
 
@@ -1690,7 +1722,7 @@ export const register: Register = (on, options) => {
       { key: 'site', hotkey: 'o', label: 'Open site', run: () => openUrl($, siteUrl(siteBase, port)) },
       ...(found ? [{ key: 'copy-tunnel', hotkey: 'u', label: 'Copy tunnel', run: (surface?: CopySurface) => copyTunnel($, surface) }] : []),
       { key: 'copy-log', hotkey: 'c', label: 'Copy log', run: surface => copyLog($, surface) },
-      { key: 'ask', hotkey: 'a', label: 'Ask Claude', run: () => askClaude($) },
+      { key: 'ask', hotkey: 'a', label: isAttached ? 'asked ✓' : 'Ask Claude', run: () => toggleAttached($) },
     ]
     const buttonLabels = actions.map(action => buttonText(action.label, action.hotkey))
     const toolbar = buttonGrid(buttonLabels, columns)
