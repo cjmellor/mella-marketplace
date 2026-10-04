@@ -55,7 +55,8 @@ of finished turns, not the API's own time.
 ## Freshness
 
 The figures are pushed by the engine after each turn and whenever a rate-limit
-window moves a whole point. Reset countdowns tick once a minute.
+window moves a whole point, and refreshed straight after `/model` and `/effort`.
+Reset countdowns tick once a minute.
 
 ## Install
 
@@ -90,6 +91,9 @@ hook returned a tree that does not validate` line.
 - Only one hook can draw the band. This mod asks the hooks beneath it for their
   tree and stacks its own row on top, so it composes with `git-diff` only when it
   loads first. A mod that draws without asking replaces this one.
+- Mods get no event for a model or effort change, only for the `/model` and
+  `/effort` commands. A level `/effort` refuses or lowers for the model still
+  shows as typed until the next turn corrects it.
 - The pane is a snapshot taken when it opens (press `r` to refresh).
 - A hot reload of the mod closes an open pane.
 - The terminal draws a button under the pointer as an inverted block. That comes
