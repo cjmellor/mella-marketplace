@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.18.1] - 2026-10-04
+
+### Changed
+
+- **`usage` plugin renamed to `session-stats`** (new plugin name, still v0.1.0). The plugin now matches its `/session-stats` command. Anyone who installed `usage@mella-marketplace` from 1.18.0 needs to uninstall it and install `session-stats@mella-marketplace`.
+
+### Removed
+
+- **Database Write Guard hook** (mella plugin → v1.16.1). The PreToolUse hook that blocked destructive database writes is gone, along with its script.
+
 ## [1.18.0] - 2026-10-04
 
 ### Added
