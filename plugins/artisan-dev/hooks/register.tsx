@@ -38,7 +38,10 @@ const STABLE_UPTIME_MS = 60_000
 const MAX_RESTARTS = 5
 const MAX_LINE = 4000
 export const PGID_MARK = '__dev_manager_pgid__:'
-const ERROR_PATTERN = /\b(error|exception|fatal|failed)\b/i
+const SEVERITY_LEAD = /^\s*(?:┌\s*)?(?:\d{4}-\d\d-\d\d[T ][\d:.]+Z?\s+)?(?:\d{1,2}:\d\d:\d\d(?:\.\d+)?(?:\s?[AP]M)?\s+)?(?:\[(?![^\]]*\b(?:error|fatal|critical)\b)[^\]\n]{1,24}\]\s*)*/i
+const LEVEL_MARK = /^(?:(?:[\w-]+\.)?(?:ERROR|CRITICAL|ALERT|EMERGENCY|FATAL|FAIL|FAILED|ERR)\b|(?:✘\s*)?\[(?:ERROR|FATAL|CRITICAL)\])/
+const CLASS_MARK = /^(?:[\w\\]*\w+Exception\b|Exception\b(?=\s*[:(─])|[\w\\]*\\\w*Error\b|\w*Error\b(?=[:(]))/
+const PHRASE_MARK = /^(?:(?:PHP )?Fatal error\b|Uncaught\b|Traceback \(most recent call last\)|(?:internal server |pre-transform )?error(?: \w+){0,3}:)/i
 const ANSI_PATTERN = /\u001b\[[0-9;:?]*[ -/]*[@-~]/g
 
 const emptyDev: Dev = { status: 'stopped', procs: [], feed: [], notes: [] }
@@ -278,6 +281,12 @@ export const matchProcess = (procs: { label: string }[], target: string): string
 
 const PROBLEM_LEVELS = new Set(['WARN', 'WARNING', 'WRN', 'ERROR', 'ERR', 'FAIL'])
 
+export const hasError = (text: string): boolean => {
+  const rest = text.slice(text.match(SEVERITY_LEAD)?.[0].length ?? 0)
+
+  return LEVEL_MARK.test(rest) || CLASS_MARK.test(rest) || PHRASE_MARK.test(rest)
+}
+
 export const isProblem = (raw: string): boolean => {
   const plain = stripAnsi(raw).replace(TIMESTAMP_PATTERN, '')
 
@@ -287,7 +296,7 @@ export const isProblem = (raw: string): boolean => {
 
   const badge = plain.match(BADGE_PATTERN)
 
-  return ERROR_PATTERN.test(plain) || (badge !== null && PROBLEM_LEVELS.has(badge[1] ?? ''))
+  return hasError(plain) || (badge !== null && PROBLEM_LEVELS.has(badge[1] ?? ''))
 }
 
 export const visibleEntries = (current: Dev, pick: string, onlyProblems: boolean): Entry[] => {
@@ -650,7 +659,7 @@ export const applyEvent = (current: Dev, event: DevEvent): Dev => {
       feed: [...current.feed, { label, text: raw, at }].slice(-MAX_FEED),
       procs: withProc(current.procs, label, proc => ({
         ...proc,
-        errors: proc.errors + (!event.quiet && ERROR_PATTERN.test(text) ? 1 : 0),
+        errors: proc.errors + (!event.quiet && hasError(text) ? 1 : 0),
         lines: [...proc.lines, raw].slice(-MAX_LINES),
       })),
     }
@@ -768,6 +777,7 @@ const lastToast: Record<string, number> = {}
 let extraHosts: string[] = []
 let project = { dir: '', name: '' }
 let tick: { cancel: () => void } | null = null
+let watching = false
 let view = { columns: 80, labelWidth: 6 }
 
 const newRunner = (spec: ProcSpec): Runner => ({
@@ -822,7 +832,7 @@ async function observe($: EngineInterface, event: DevEvent, at: number) {
     }
   }
 
-  if (ERROR_PATTERN.test(raw) && at - (lastToast[label] ?? 0) > TOAST_GAP_MS) {
+  if (hasError(raw) && at - (lastToast[label] ?? 0) > TOAST_GAP_MS) {
     lastToast[label] = at
     $.ui.toast(`${label} — ${stripAnsi(raw).trim().slice(0, 80)}`, { timeoutMs: 6000 })
   }
@@ -875,6 +885,20 @@ async function refreshRepo($: EngineInterface) {
 }
 
 async function watchLayout($: EngineInterface) {
+  if (watching) {
+    return
+  }
+
+  watching = true
+
+  try {
+    await readLayout($)
+  } finally {
+    watching = false
+  }
+}
+
+async function readLayout($: EngineInterface) {
   const cwd = project.dir
   const named = await $.process.run(['git', 'branch', '--show-current'], { cwd })
   const detached = named.exitCode === 0 && !named.stdout.trim() ? await $.process.run(['git', 'rev-parse', '--short', 'HEAD'], { cwd }) : null
@@ -1616,7 +1640,7 @@ export const layoutEntry = (entry: Entry, withName: boolean, labelWidth: number,
     ansi,
     level,
     message,
-    isError: !badge && !ansi && ERROR_PATTERN.test(text),
+    isError: !badge && !ansi && hasError(text),
     time,
     name,
     extra,
@@ -1725,6 +1749,16 @@ export const register: Register = (on, options) => {
     await releaseAll($, Math.max(0, Math.min(TERM_GRACE_MS, next.budget.remainingMs - 500)))
 
     return next(e)
+  })
+
+  on('tool.call', { tool: ['EnterWorktree', 'ExitWorktree'] }, async ($, e, next) => {
+    const result = await next(e)
+
+    $.clock.after(0, () => {
+      void watchLayout($).catch(() => undefined)
+    })
+
+    return result
   })
 
   on('prompt.submit', async ($, e, next) => {

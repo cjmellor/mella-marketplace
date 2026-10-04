@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import type { Dev } from '../types'
-import { fitWhere, layoutChange, parseLayout, parseRepo, applyEvent, colorFor, applySgr, buttonGrid, buttonText, clearedLog, color256, afterCarriage, findTunnelUrl, layoutEntry, isProblem, logText, matchProcess, parseHosts, statusText, visibleEntries, effectivePort, gridRows, hasAnsi, logRoom, nextBack, judgeExit, noProcess, parseAnsi, wrapRanges, wrapSegments, parseDevArgs, statusColor, parseDevList, parseEnvPort, parseEnvValue, siteUrl, promptText, rule, spawnArgv, toPort, PGID_MARK, splitLines, stripAnsi, summarise, uptime, wrapText } from './register'
+import { fitWhere, hasError, layoutChange, parseLayout, parseRepo, applyEvent, colorFor, applySgr, buttonGrid, buttonText, clearedLog, color256, afterCarriage, findTunnelUrl, layoutEntry, isProblem, logText, matchProcess, parseHosts, statusText, visibleEntries, effectivePort, gridRows, hasAnsi, logRoom, nextBack, judgeExit, noProcess, parseAnsi, wrapRanges, wrapSegments, parseDevArgs, statusColor, parseDevList, parseEnvPort, parseEnvValue, siteUrl, promptText, rule, spawnArgv, toPort, PGID_MARK, splitLines, stripAnsi, summarise, uptime, wrapText } from './register'
 
 const empty: Dev = { status: 'running', procs: [], feed: [], notes: [] }
 const started = applyEvent(empty, { type: 'start', label: 'server', command: 'php artisan serve', pid: 10, time: '2026-10-03T16:00:00.000Z' })
@@ -471,4 +471,24 @@ test('a branch switch or a worktree appearing counts as a change, the first read
   expect(layoutChange(main, main)).toBeNull()
   expect(layoutChange(main, parseLayout('', 'abc123\n', porcelain))).toBe('Branch changed to abc123')
   expect(layoutChange(main, added)).toBe('Worktrees changed')
+})
+
+test('only a severity marker where the tool puts one counts as an error', () => {
+  expect(hasError('[2026-08-19 14:45:31] local.ERROR: SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "cache" does not exist')).toBe(true)
+  expect(hasError('┌ 14:45:31 ERROR ────────────────────────────')).toBe(true)
+  expect(hasError('┌ 14:45:31 Illuminate\\Database\\QueryException ───')).toBe(true)
+  expect(hasError('┌ 14:45:31 PDOException ───')).toBe(true)
+  expect(hasError('4:37:54 PM [vite] Internal server error: Failed to resolve import "x"')).toBe(true)
+  expect(hasError('✘ [ERROR] Could not resolve "./missing"')).toBe(true)
+  expect(hasError('error during build:')).toBe(true)
+  expect(hasError('PHP Fatal error:  Uncaught TypeError: x')).toBe(true)
+  expect(hasError('TypeError: Cannot read properties of undefined')).toBe(true)
+
+  expect(hasError('16:37:54 [vite+] (client) page reload vendor/amphp/http-server/resources/error.html')).toBe(false)
+  expect(hasError('│ SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "cache" does not exist')).toBe(false)
+  expect(hasError('[previous exception] [object] (PDOException(code: 42P01): SQLSTATE[42P01]: Undefined table')).toBe(false)
+  expect(hasError('                      ^ (Connection: pgsql, SQL: select * from "cache")')).toBe(false)
+  expect(hasError('Error handling is configured for the failed jobs table')).toBe(false)
+  expect(hasError('[2026-10-04 14:21:39] local.DEBUG: [vite] connected. {"url":"https://kandu.test/login"}')).toBe(false)
+  expect(hasError('it_handles_failed_jobs ✓')).toBe(false)
 })
