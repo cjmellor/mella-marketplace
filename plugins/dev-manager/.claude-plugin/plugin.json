@@ -1,0 +1,23 @@
+{
+  "name": "dev-manager",
+  "version": "0.1.0",
+  "description": "Runs `php artisan dev` for a Laravel project and manages it from a pane: per-process logs, restart and stop controls, port override, site and tunnel links.",
+  "author": { "name": "Chris Mellor" },
+  "keywords": ["laravel", "dev-server", "pane", "mod", "artisan"],
+  "license": "MIT",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "projectDir": {
+      "type": "string",
+      "title": "Project folder",
+      "description": "Absolute path of the Laravel app whose `php artisan dev` this manages. Empty uses the session's folder.",
+      "default": ""
+    },
+    "tunnelHosts": {
+      "type": "string",
+      "title": "Extra tunnel hosts",
+      "description": "Comma-separated domains whose URLs count as a public tunnel, e.g. my-tunnel.example.com. Built in: Cloudflare, ngrok, Expose/Herd share, localtunnel, localhost.run, Serveo, Pinggy, Tailscale funnel, Dev Tunnels.",
+      "default": ""
+    }
+  }
+}

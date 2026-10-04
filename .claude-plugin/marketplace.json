@@ -24,6 +24,14 @@
       "version": "0.1.0",
       "keywords": ["memory", "recall", "context", "session", "persistence", "brain"],
       "license": "MIT"
+    },
+    {
+      "name": "dev-manager",
+      "source": "./plugins/dev-manager",
+      "description": "Runs `php artisan dev` for a Laravel project and manages it from a pane: per-process logs, restart and stop controls, port override, site and tunnel links.",
+      "version": "0.1.0",
+      "keywords": ["laravel", "dev-server", "pane", "mod", "artisan"],
+      "license": "MIT"
     }
   ]
 }
