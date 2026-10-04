@@ -48,6 +48,14 @@
       "version": "0.1.0",
       "keywords": ["laravel", "dev-server", "pane", "mod", "artisan"],
       "license": "MIT"
+    },
+    {
+      "name": "worktree-ready",
+      "source": "./plugins/worktree-ready",
+      "description": "Makes a new git worktree of a Laravel app ready with no hands: copy-on-write clones of vendor, node_modules and built assets, a Valet or Herd HTTPS site, and clean-up when you leave.",
+      "version": "0.1.0",
+      "keywords": ["laravel", "worktree", "valet", "herd", "mod", "copy-on-write"],
+      "license": "MIT"
     }
   ]
 }
