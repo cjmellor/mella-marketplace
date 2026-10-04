@@ -26,12 +26,6 @@ Automatic, always-on cross-session memory. grain quietly records what you did an
 
 It runs entirely through three lifecycle hooks (SessionStart recalls, PreCompact checkpoints, SessionEnd finalises). Capture is pattern-based and local — **no model calls, no API keys, no cost, no network.** Memory lives as plain Markdown under `~/.claude/grain/`, keyed per project. See [`plugins/grain/README.md`](plugins/grain/README.md) for controls and details.
 
-### usage
-
-A Claude Code mod that puts the model, context fill and rate-limit usage (`5h` and weekly, with reset countdowns) in a band above the prompt, coloured green, yellow or red as each fills. Open the `+` button on the band or run `/usage` for a pane that breaks the context window down by category. See [`plugins/usage/README.md`](plugins/usage/README.md) for details.
-
-Mods run code on your machine, so `usage` is a separate plugin: install it only if you want it.
-
 ## Installation
 
 **1. Add the marketplace:**
@@ -51,9 +45,6 @@ Mods run code on your machine, so `usage` is a separate plugin: install it only 
 
 # Or the always-on cross-session memory plugin
 /plugin install grain@mella-marketplace
-
-# Or the model, context and rate-limit usage mod
-/plugin install usage@mella-marketplace
 ```
 
 **3. Start using:**
@@ -85,7 +76,6 @@ Mods run code on your machine, so `usage` is a separate plugin: install it only 
 
 ```bash
 /plugin uninstall mella@mella-marketplace
-/plugin uninstall usage@mella-marketplace
 /plugin marketplace remove mella-marketplace
 ```
 
