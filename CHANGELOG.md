@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.18.0] - 2026-10-04
+
+### Added
+
+- **`git-diff` mod** (new plugin → v0.1.0). Keeps your uncommitted git changes in view: a band above the prompt shows files changed, lines added and removed and the current branch, and a pane (`/git-diff`) lists every changed file as a flat list or a folder tree.
+- **`usage` mod** (new plugin → v0.1.0). Shows the model, reasoning effort, context fill and rate-limit usage above the prompt, so you can drop a `statusline` script for them. `/session-stats` opens a pane that breaks the context window down.
+- **`artisan-dev` mod** (new plugin → v0.1.0). Runs a Laravel app's `php artisan dev` from inside Claude Code. `/dev` starts the processes and opens a pane with per-process logs and restart, stop, error-filter, copy, tunnel and site controls; `/dev ask` attaches the server state to your next prompt. The servers and their state survive `/clear`.
+
 ## [1.17.0] - 2026-09-27
 
 ### Added
