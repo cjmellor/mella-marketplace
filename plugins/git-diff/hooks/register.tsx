@@ -181,11 +181,28 @@ async function togglePane($: EngineInterface) {
   await openPane($)
 }
 
+const RESEED_MS = 500
+
+async function seed($: EngineInterface) {
+  await update($, isOpen, () => false)
+  await refresh($)
+}
+
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({ name: 'git-diff', description: 'Show uncommitted changes per file in a pane' })
-    await update($, isOpen, () => false)
-    await refresh($)
+    await seed($)
+
+    return next(e)
+  })
+
+  // /clear resets this plugin's state after session.end and fires no session.start, so setup reruns from a timer.
+  on('session.end', async ($, e, next) => {
+    if (e.reason === 'clear') {
+      $.clock.after(RESEED_MS, () => {
+        void seed($)
+      })
+    }
 
     return next(e)
   })
