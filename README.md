@@ -26,12 +26,6 @@ Automatic, always-on cross-session memory. grain quietly records what you did an
 
 It runs entirely through three lifecycle hooks (SessionStart recalls, PreCompact checkpoints, SessionEnd finalises). Capture is pattern-based and local — **no model calls, no API keys, no cost, no network.** Memory lives as plain Markdown under `~/.claude/grain/`, keyed per project. See [`plugins/grain/README.md`](plugins/grain/README.md) for controls and details.
 
-### git-diff
-
-A Claude Code mod that keeps your uncommitted git changes in view. A band above the prompt shows files changed, lines added (green) and removed (red) with a GitHub-style bar, counting untracked files too. Open the `+` button on the band or run `/git-diff` for a pane listing each changed file, switchable between a list and a folder tree. See [`plugins/git-diff/README.md`](plugins/git-diff/README.md) for details.
-
-Mods run code on your machine, so `git-diff` is a separate plugin: install it only if you want it.
-
 ## Installation
 
 **1. Add the marketplace:**
@@ -51,9 +45,6 @@ Mods run code on your machine, so `git-diff` is a separate plugin: install it on
 
 # Or the always-on cross-session memory plugin
 /plugin install grain@mella-marketplace
-
-# Or the git changes band and pane mod
-/plugin install git-diff@mella-marketplace
 ```
 
 **3. Start using:**
@@ -85,7 +76,6 @@ Mods run code on your machine, so `git-diff` is a separate plugin: install it on
 
 ```bash
 /plugin uninstall mella@mella-marketplace
-/plugin uninstall git-diff@mella-marketplace
 /plugin marketplace remove mella-marketplace
 ```
 
