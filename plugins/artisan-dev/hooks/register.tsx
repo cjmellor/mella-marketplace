@@ -103,6 +103,12 @@ export const parseEnvPort = (text: string): number | null => {
   return value === null ? null : toPort(value)
 }
 
+export const siteHost = (appUrl: string | null): string | null => {
+  const host = appUrl?.match(/^https?:\/\/([^/:?#]+)/i)?.[1]
+
+  return host && host !== 'localhost' && host !== '127.0.0.1' ? host : null
+}
+
 export const siteUrl = (appUrl: string | null, port: number | null): string => {
   const fallback = `http://127.0.0.1:${port ?? DEFAULT_PORT}`
   const found = appUrl?.match(/^(https?:\/\/)([^/:?#]+)(:\d+)?(.*)$/i)
@@ -229,7 +235,7 @@ export const parseRepo = (revParse: string, branch: string, head: string): Repo 
   }
 }
 
-export const fitWhere = (where: Repo | null, room: number): string => {
+export const fitWhere = (where: Repo | null, room: number): { branch: string; worktree: string } => {
   const items = [
     ['⎇', where?.branch],
     ['⌂', where?.worktree],
@@ -247,7 +253,7 @@ export const fitWhere = (where: Repo | null, room: number): string => {
     remaining -= 1
   }
 
-  return items.map(([icon]) => ` · ${icon} ${shown.get(icon)}`).join('')
+  return { branch: shown.get('⎇') ?? '', worktree: shown.get('⌂') ?? '' }
 }
 
 export const parseLayout = (branch: string, head: string, porcelain: string): Layout => ({
@@ -1810,29 +1816,39 @@ export const register: Register = (on, options) => {
     const base = await read($, appUrl)
     const where = await read($, repo)
     const detail = current.status === 'stopped' ? ' stopped' : ` · ${up}/${total} up`
-    const site = current.status === 'stopped' ? 0 : 1 + (port ? `:${port} ↗` : '↗ site').length
+    const host = siteHost(base)
+    const nameLinks = Boolean(where?.worktree && host)
+    const siteLabel = host ? `${host} ↗` : port ? `:${port} ↗` : '↗ site'
+    const showSite = current.status !== 'stopped' && !nameLinks
+    const site = showSite ? 1 + siteLabel.length : 0
     const errorText = errors > 0 ? ` · ${errors} err` : ''
-    const used = ' dev'.length + 1 + site + detail.length + errorText.length + BAND_RESERVE
-    const whereText = fitWhere(where, e.props.bodyColumns - used)
+    const used = ' dev'.length + 1 + site + detail.length + errorText.length + BAND_RESERVE + (nameLinks ? 2 : 0)
+    const shown = fitWhere(where, e.props.bodyColumns - used)
 
     return stack(
       <Box>
         <Text color={color} dimColor={color === undefined}>●</Text>
         <Text bold>{' dev'}</Text>
-        {current.status === 'stopped' ? null : (
+        {showSite ? (
           <Box marginLeft={1}>
             <Button
               key="dev-site"
-              label={port ? `:${port} ↗` : '↗ site'}
+              label={siteLabel}
               plain
               dimColor
               onPress={() => openUrl($, siteUrl(base, port))}
             />
           </Box>
-        )}
+        ) : null}
         <Text dimColor>{detail}</Text>
         {errors > 0 ? <Text color="red">{errorText}</Text> : null}
-        {whereText ? <Text dimColor>{whereText}</Text> : null}
+        {shown.branch ? <Text dimColor>{` · ⎇ ${shown.branch}`}</Text> : null}
+        {shown.worktree ? <Text dimColor>{' · ⌂ '}</Text> : null}
+        {shown.worktree && nameLinks && current.status !== 'stopped' ? (
+          <Button key="dev-worktree" label={`${shown.worktree} ↗`} plain dimColor onPress={() => openUrl($, siteUrl(base, port))} />
+        ) : shown.worktree ? (
+          <Text dimColor>{shown.worktree}</Text>
+        ) : null}
         <Text>  </Text>
         <Button key="dev-toggle" label={open ? '−' : '+'} plain dimColor onPress={() => togglePane($)} />
       </Box>,
