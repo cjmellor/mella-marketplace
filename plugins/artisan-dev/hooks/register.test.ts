@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import type { Dev } from '../types'
-import { applyEvent, colorFor, applySgr, buttonGrid, buttonText, clearedLog, color256, afterCarriage, findTunnelUrl, layoutEntry, isProblem, logText, matchProcess, parseHosts, statusText, visibleEntries, effectivePort, gridRows, hasAnsi, logRoom, nextBack, judgeExit, noProcess, parseAnsi, wrapRanges, wrapSegments, parseDevArgs, statusColor, parseDevList, parseEnvPort, parseEnvValue, siteUrl, promptText, rule, spawnArgv, toPort, PGID_MARK, splitLines, stripAnsi, summarise, uptime, wrapText } from './register'
+import { fitWhere, hasError, layoutChange, parseLayout, parseRepo, applyEvent, colorFor, applySgr, buttonGrid, buttonText, clearedLog, color256, afterCarriage, findTunnelUrl, layoutEntry, isProblem, logText, matchProcess, parseHosts, statusText, visibleEntries, effectivePort, gridRows, hasAnsi, logRoom, nextBack, judgeExit, noProcess, parseAnsi, wrapRanges, wrapSegments, parseDevArgs, statusColor, parseDevList, parseEnvPort, parseEnvValue, siteUrl, siteHost, promptText, rule, spawnArgv, toPort, PGID_MARK, splitLines, stripAnsi, summarise, uptime, wrapText } from './register'
 
 const empty: Dev = { status: 'running', procs: [], feed: [], notes: [] }
 const started = applyEvent(empty, { type: 'start', label: 'server', command: 'php artisan serve', pid: 10, time: '2026-10-03T16:00:00.000Z' })
@@ -32,7 +32,6 @@ test('tracks start, output, errors and restarts', () => {
 
   expect(output.procs[0]?.lines).toHaveLength(1)
   expect(failed.procs[0]?.errors).toBe(1)
-  expect(restarted.procs[0]?.restarts).toBe(1)
   expect(restarted.procs[0]?.pid).toBe(11)
   expect(restarted.procs[0]?.errors).toBe(0)
   expect(summarise(failed)).toEqual({ total: 1, up: 1, errors: 1 })
@@ -254,7 +253,6 @@ test('clearing the log empties every log and error count but keeps the process r
   expect(cleared.procs.map(proc => proc.label)).toEqual(['server'])
   expect(cleared.procs[0]?.lines).toEqual([])
   expect(cleared.procs[0]?.errors).toBe(0)
-  expect(cleared.procs[0]?.restarts).toBe(busy.procs[0]?.restarts)
 })
 
 test('reads APP_URL from .env, skipping commented lines and trailing comments', () => {
@@ -443,4 +441,63 @@ test('an ANSI entry is laid out on its visible text, not its escape codes', () =
   const coloured = { label: 'vite', text: `${ESC}[32m${'x'.repeat(100)}${ESC}[0m`, at: 0 }
 
   expect(layoutEntry(coloured, false, 6, 62)).toMatchObject({ ansi: true, level: null, count: 2 })
+})
+
+test('parses the branch and names a linked worktree', () => {
+  expect(parseRepo('/a/kandu\n/a/kandu/.git\n/a/kandu/.git', 'main\n', '')).toEqual({ branch: 'main', worktree: null })
+  expect(parseRepo('/a/kandu/.claude/worktrees/fix\n/a/kandu/.git/worktrees/fix\n/a/kandu/.git', 'fix-x\n', '')).toEqual({ branch: 'fix-x', worktree: 'fix' })
+  expect(parseRepo('/a/kandu\n/a/kandu/.git\n/a/kandu/.git', '', 'abc123\n')).toEqual({ branch: 'abc123', worktree: null })
+  expect(parseRepo('', '', '')).toBeNull()
+})
+
+test('names the host of a site that is not loopback', () => {
+  expect(siteHost('https://kandu-purring-crafting.test')).toBe('kandu-purring-crafting.test')
+  expect(siteHost('https://kandu.test:8443/app')).toBe('kandu.test')
+  expect(siteHost('http://localhost:8000')).toBeNull()
+  expect(siteHost('http://127.0.0.1')).toBeNull()
+  expect(siteHost('http://0.0.0.0:8000')).toBeNull()
+  expect(siteHost('http://[::1]:8000')).toBeNull()
+  expect(siteHost(null)).toBeNull()
+})
+
+test('fits the branch and worktree into the room the band has left', () => {
+  const both = { branch: 'worktree-purring-crafting', worktree: 'purring-crafting' }
+
+  expect(fitWhere(both, 80)).toEqual({ branch: 'worktree-purring-crafting', worktree: 'purring-crafting' })
+  expect(fitWhere(both, 30)).toEqual({ branch: 'worktree-…', worktree: 'purring-c…' })
+  expect(fitWhere({ branch: 'main', worktree: null }, 30)).toEqual({ branch: 'main', worktree: '' })
+  expect(fitWhere(null, 30)).toEqual({ branch: '', worktree: '' })
+  expect(fitWhere(both, 8)).toEqual({ branch: '', worktree: '' })
+})
+
+test('a branch switch or a worktree appearing counts as a change, the first read does not', () => {
+  const porcelain = 'worktree /a/kandu\nHEAD abc\nbranch refs/heads/main\n'
+  const main = parseLayout('main\n', '', porcelain)
+  const added = parseLayout('main\n', '', `${porcelain}\nworktree /a/kandu/.claude/worktrees/x\nHEAD abc\n`)
+
+  expect(main).toEqual({ branch: 'main', worktrees: ['/a/kandu'] })
+  expect(layoutChange(null, main)).toBeNull()
+  expect(layoutChange(main, main)).toBeNull()
+  expect(layoutChange(main, parseLayout('', 'abc123\n', porcelain))).toBe('Branch changed to abc123')
+  expect(layoutChange(main, added)).toBe('Worktrees changed')
+})
+
+test('only a severity marker where the tool puts one counts as an error', () => {
+  expect(hasError('[2026-08-19 14:45:31] local.ERROR: SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "cache" does not exist')).toBe(true)
+  expect(hasError('┌ 14:45:31 ERROR ────────────────────────────')).toBe(true)
+  expect(hasError('┌ 14:45:31 Illuminate\\Database\\QueryException ───')).toBe(true)
+  expect(hasError('┌ 14:45:31 PDOException ───')).toBe(true)
+  expect(hasError('4:37:54 PM [vite] Internal server error: Failed to resolve import "x"')).toBe(true)
+  expect(hasError('✘ [ERROR] Could not resolve "./missing"')).toBe(true)
+  expect(hasError('error during build:')).toBe(true)
+  expect(hasError('PHP Fatal error:  Uncaught TypeError: x')).toBe(true)
+  expect(hasError('TypeError: Cannot read properties of undefined')).toBe(true)
+
+  expect(hasError('16:37:54 [vite+] (client) page reload vendor/amphp/http-server/resources/error.html')).toBe(false)
+  expect(hasError('│ SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "cache" does not exist')).toBe(false)
+  expect(hasError('[previous exception] [object] (PDOException(code: 42P01): SQLSTATE[42P01]: Undefined table')).toBe(false)
+  expect(hasError('                      ^ (Connection: pgsql, SQL: select * from "cache")')).toBe(false)
+  expect(hasError('Error handling is configured for the failed jobs table')).toBe(false)
+  expect(hasError('[2026-10-04 14:21:39] local.DEBUG: [vite] connected. {"url":"https://kandu.test/login"}')).toBe(false)
+  expect(hasError('it_handles_failed_jobs ✓')).toBe(false)
 })

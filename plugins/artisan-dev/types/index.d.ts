@@ -7,7 +7,6 @@ export type Proc = {
   pid: number
   state: ProcState
   startedAt: number
-  restarts: number
   errors: number
   lines: string[]
 }
@@ -36,6 +35,10 @@ export type DevEvent = {
   time?: string
 }
 
+export type Repo = { branch: string | null; worktree: string | null }
+
+export type Layout = { branch: string; worktrees: string[] }
+
 declare module 'claude-code' {
   interface PluginState {
     'artisan-dev': {
@@ -51,6 +54,8 @@ declare module 'claude-code' {
       onlyErrors: boolean
       tunnel: { label: string; url: string } | null
       attached: { label: string | null; text: string } | null
+      repo: Repo | null
+      layout: Layout | null
     }
   }
 }

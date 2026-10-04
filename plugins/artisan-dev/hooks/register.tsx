@@ -1,7 +1,7 @@
 import type { EngineInterface, Register, RenderChildren } from 'claude-code'
 import { atom, read, update } from 'claude-code'
 
-import type { Dev, DevEvent, Entry, Proc } from '../types'
+import type { Dev, DevEvent, Entry, Layout, Proc, Repo } from '../types'
 
 const DEFAULT_PORT = 8000
 const PANE = 'dev'
@@ -28,6 +28,8 @@ const BADGES: Record<string, string> = {
 const BADGE_PATTERN = /^\s*(INFO|NOTICE|WARN|WARNING|ERROR|FAIL|DEBUG|INF|WRN|ERR|DBG)\b\s*(.*)$/
 const TIMESTAMP_PATTERN = /^\d{4}-\d\d-\d\dT[\d:.]+Z?\s+/
 const TICK_MS = 5000
+const WHERE_OVERHEAD = 5
+const BAND_RESERVE = 6
 const TOAST_GAP_MS = 15_000
 const TERM_GRACE_MS = 2000
 const RESTART_DELAY_MS = 1000
@@ -36,7 +38,10 @@ const STABLE_UPTIME_MS = 60_000
 const MAX_RESTARTS = 5
 const MAX_LINE = 4000
 export const PGID_MARK = '__dev_manager_pgid__:'
-const ERROR_PATTERN = /\b(error|exception|fatal|failed)\b/i
+const SEVERITY_LEAD = /^\s*(?:┌\s*)?(?:\d{4}-\d\d-\d\d[T ][\d:.]+Z?\s+)?(?:\d{1,2}:\d\d:\d\d(?:\.\d+)?(?:\s?[AP]M)?\s+)?(?:\[(?![^\]]*\b(?:error|fatal|critical)\b)[^\]\n]{1,24}\]\s*)*/i
+const LEVEL_MARK = /^(?:(?:[\w-]+\.)?(?:ERROR|CRITICAL|ALERT|EMERGENCY|FATAL|FAIL|FAILED|ERR)\b|(?:✘\s*)?\[(?:ERROR|FATAL|CRITICAL)\])/
+const CLASS_MARK = /^(?:[\w\\]*\w+Exception\b|Exception\b(?=\s*[:(─])|[\w\\]*\\\w*Error\b|\w*Error\b(?=[:(]))/
+const PHRASE_MARK = /^(?:(?:PHP )?Fatal error\b|Uncaught\b|Traceback \(most recent call last\)|(?:internal server |pre-transform )?error(?: \w+){0,3}:)/i
 const ANSI_PATTERN = /\u001b\[[0-9;:?]*[ -/]*[@-~]/g
 
 const emptyDev: Dev = { status: 'stopped', procs: [], feed: [], notes: [] }
@@ -53,6 +58,8 @@ const scrollBack = atom({ plugin: 'artisan-dev', key: 'back' } as const, 0)
 const onlyErrors = atom({ plugin: 'artisan-dev', key: 'onlyErrors' } as const, false)
 const tunnel = atom({ plugin: 'artisan-dev', key: 'tunnel' } as const, null)
 const attached = atom({ plugin: 'artisan-dev', key: 'attached' } as const, null)
+const repo = atom({ plugin: 'artisan-dev', key: 'repo' } as const, null)
+const layout = atom({ plugin: 'artisan-dev', key: 'layout' } as const, null)
 
 const WHEEL_STEP = 3
 
@@ -96,18 +103,28 @@ export const parseEnvPort = (text: string): number | null => {
   return value === null ? null : toPort(value)
 }
 
-export const siteUrl = (appUrl: string | null, port: number | null): string => {
-  const fallback = `http://127.0.0.1:${port ?? DEFAULT_PORT}`
-  const found = appUrl?.match(/^(https?:\/\/)([^/:?#]+)(:\d+)?(.*)$/i)
+const LOOPBACK_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', '[::1]']
 
-  if (!appUrl || !found) {
-    return fallback
+const parseSite = (appUrl: string | null): { scheme: string; host: string; rest: string } | null => {
+  const found = appUrl?.match(/^(https?:\/\/)(\[[^\]]+\]|[^/:?#]+)(:\d+)?(.*)$/i)
+
+  return found ? { scheme: found[1] ?? '', host: found[2] ?? '', rest: found[4] ?? '' } : null
+}
+
+export const siteHost = (appUrl: string | null): string | null => {
+  const host = parseSite(appUrl)?.host
+
+  return host && !LOOPBACK_HOSTS.includes(host) ? host : null
+}
+
+export const siteUrl = (appUrl: string | null, port: number | null): string => {
+  const site = parseSite(appUrl)
+
+  if (!appUrl || !site) {
+    return `http://127.0.0.1:${port ?? DEFAULT_PORT}`
   }
 
-  const [, scheme = '', host = '', , rest = ''] = found
-  const isLoopback = host === 'localhost' || host === '127.0.0.1'
-
-  return isLoopback && port ? `${scheme}${host}:${port}${rest}` : appUrl
+  return LOOPBACK_HOSTS.includes(site.host) && port ? `${site.scheme}${site.host}:${port}${site.rest}` : appUrl
 }
 
 export const DEV_ACTIONS = [
@@ -201,13 +218,69 @@ export const statusText = (name: string, current: Dev, port: number | null, url:
   const width = Math.max(...current.procs.map(proc => proc.label.length))
   const rows = current.procs.map(proc => {
     const age = proc.state === 'up' ? `  ${uptime(proc.startedAt, at)}` : ''
-    const restarts = proc.restarts > 0 ? `  ↻${proc.restarts}` : ''
     const errors = proc.errors > 0 ? `  ⚠${proc.errors}` : ''
 
-    return `${proc.state === 'up' ? '●' : '○'} ${proc.label.padEnd(width)}  ${proc.state}${age}${restarts}${errors}`
+    return `${proc.state === 'up' ? '●' : '○'} ${proc.label.padEnd(width)}  ${proc.state}${age}${errors}`
   })
 
   return [`${name} dev — ${current.status} · ${up}/${total} up${port ? ` · :${port}` : ''}`, url, ...rows].join('\n')
+}
+
+const pickBranch = (named: string, detached: string): string => named.trim() || detached.trim()
+
+export const parseRepo = (revParse: string, branch: string, head: string): Repo | null => {
+  const [toplevel, gitDir, commonDir] = revParse.split('\n').map(line => line.trim())
+
+  if (!toplevel || !gitDir || !commonDir) {
+    return null
+  }
+
+  return {
+    branch: pickBranch(branch, head) || null,
+    worktree: gitDir === commonDir ? null : (toplevel.split('/').filter(Boolean).pop() ?? null),
+  }
+}
+
+export const fitWhere = (where: Repo | null, room: number): { branch: string; worktree: string } => {
+  const names = [where?.branch ?? '', where?.worktree ?? '']
+  const order = names.flatMap((name, slot) => (name ? [{ name, slot }] : [])).sort((a, b) => a.name.length - b.name.length)
+  const shown = ['', '']
+  let left = room - order.length * WHERE_OVERHEAD
+
+  if (left < order.length) {
+    return { branch: '', worktree: '' }
+  }
+
+  order.forEach(({ name, slot }, done) => {
+    const cap = Math.floor(left / (order.length - done))
+    const text = name.length > cap ? `${name.slice(0, cap - 1)}…` : name
+
+    shown[slot] = text
+    left -= text.length
+  })
+
+  return { branch: shown[0] ?? '', worktree: shown[1] ?? '' }
+}
+
+export const parseLayout = (branch: string, head: string, porcelain: string): Layout => ({
+  branch: pickBranch(branch, head),
+  worktrees: porcelain
+    .split('\n')
+    .filter(line => line.startsWith('worktree '))
+    .map(line => line.slice('worktree '.length))
+    .sort(),
+})
+
+export const layoutChange = (last: Layout | null, next: Layout): string | null => {
+  if (!last) {
+    return null
+  }
+
+  if (last.branch !== next.branch) {
+    return `Branch changed to ${next.branch}`
+  }
+
+  return last.worktrees.join('\n') === next.worktrees.join('\n') ? null : 'Worktrees changed'
 }
 
 export const matchProcess = (procs: { label: string }[], target: string): string | null => {
@@ -220,6 +293,12 @@ export const matchProcess = (procs: { label: string }[], target: string): string
 
 const PROBLEM_LEVELS = new Set(['WARN', 'WARNING', 'WRN', 'ERROR', 'ERR', 'FAIL'])
 
+export const hasError = (text: string): boolean => {
+  const rest = text.slice(text.match(SEVERITY_LEAD)?.[0].length ?? 0)
+
+  return LEVEL_MARK.test(rest) || CLASS_MARK.test(rest) || PHRASE_MARK.test(rest)
+}
+
 export const isProblem = (raw: string): boolean => {
   const plain = stripAnsi(raw).replace(TIMESTAMP_PATTERN, '')
 
@@ -229,7 +308,7 @@ export const isProblem = (raw: string): boolean => {
 
   const badge = plain.match(BADGE_PATTERN)
 
-  return ERROR_PATTERN.test(plain) || (badge !== null && PROBLEM_LEVELS.has(badge[1] ?? ''))
+  return hasError(plain) || (badge !== null && PROBLEM_LEVELS.has(badge[1] ?? ''))
 }
 
 export const visibleEntries = (current: Dev, pick: string, onlyProblems: boolean): Entry[] => {
@@ -549,7 +628,6 @@ export const applyEvent = (current: Dev, event: DevEvent): Dev => {
       pid: event.pid ?? 0,
       state: 'up',
       startedAt: at,
-      restarts: 0,
       errors: 0,
       lines: [],
     }
@@ -564,7 +642,6 @@ export const applyEvent = (current: Dev, event: DevEvent): Dev => {
             pid: event.pid ?? proc.pid,
             state: 'up',
             startedAt: at,
-            restarts: proc.restarts + 1,
             errors: 0,
           }))
         : [...current.procs, fresh],
@@ -592,7 +669,7 @@ export const applyEvent = (current: Dev, event: DevEvent): Dev => {
       feed: [...current.feed, { label, text: raw, at }].slice(-MAX_FEED),
       procs: withProc(current.procs, label, proc => ({
         ...proc,
-        errors: proc.errors + (!event.quiet && ERROR_PATTERN.test(text) ? 1 : 0),
+        errors: proc.errors + (!event.quiet && hasError(text) ? 1 : 0),
         lines: [...proc.lines, raw].slice(-MAX_LINES),
       })),
     }
@@ -709,7 +786,10 @@ const runners = new Map<string, Runner>()
 const lastToast: Record<string, number> = {}
 let extraHosts: string[] = []
 let project = { dir: '', name: '' }
+let siteDir = ''
+let rewatch = false
 let tick: { cancel: () => void } | null = null
+let watching = false
 let view = { columns: 80, labelWidth: 6 }
 
 const newRunner = (spec: ProcSpec): Runner => ({
@@ -764,7 +844,7 @@ async function observe($: EngineInterface, event: DevEvent, at: number) {
     }
   }
 
-  if (ERROR_PATTERN.test(raw) && at - (lastToast[label] ?? 0) > TOAST_GAP_MS) {
+  if (hasError(stripAnsi(raw)) && at - (lastToast[label] ?? 0) > TOAST_GAP_MS) {
     lastToast[label] = at
     $.ui.toast(`${label} — ${stripAnsi(raw).trim().slice(0, 80)}`, { timeoutMs: 6000 })
   }
@@ -804,8 +884,76 @@ async function emit($: EngineInterface, input: DevEvent | DevEvent[]) {
   }
 }
 
+async function readBranch($: EngineInterface, cwd?: string) {
+  const git = (argv: string[]) => (cwd ? $.process.run(argv, { cwd }) : $.process.run(argv))
+  const named = await git(['git', 'branch', '--show-current'])
+  const detached = named.exitCode === 0 && !named.stdout.trim() ? await git(['git', 'rev-parse', '--short', 'HEAD']) : null
+
+  return { ok: named.exitCode === 0, named: named.stdout, detached: detached?.stdout ?? '' }
+}
+
+async function refreshRepo($: EngineInterface) {
+  const top = await $.process.run(['git', 'rev-parse', '--path-format=absolute', '--show-toplevel', '--git-dir', '--git-common-dir', '--show-prefix'])
+  const branch = top.exitCode === 0 ? await readBranch($) : null
+  const next = branch ? parseRepo(top.stdout, branch.named, branch.detached) : null
+  const last = await read($, repo)
+  const [toplevel = '', , , prefix = ''] = top.stdout.split('\n').map(line => line.trim())
+  siteDir = prefix ? `${toplevel}/${prefix.replace(/\/$/, '')}` : toplevel
+
+  await loadAppUrl($)
+
+  if (last?.branch !== next?.branch || last?.worktree !== next?.worktree) {
+    await update($, repo, () => next)
+  }
+}
+
+async function watchLayout($: EngineInterface) {
+  if (watching) {
+    rewatch = true
+
+    return
+  }
+
+  watching = true
+
+  try {
+    do {
+      rewatch = false
+      await readLayout($)
+    } while (rewatch)
+  } finally {
+    watching = false
+  }
+}
+
+async function readLayout($: EngineInterface) {
+  const cwd = project.dir
+  const branch = await readBranch($, cwd)
+  const listed = await $.process.run(['git', 'worktree', 'list', '--porcelain'], { cwd })
+
+  if (!branch.ok || listed.exitCode !== 0) {
+    return
+  }
+
+  const next = parseLayout(branch.named, branch.detached, listed.stdout)
+  const reason = layoutChange(await read($, layout), next)
+  await update($, layout, () => next)
+
+  if (reason && (await read($, dev)).status === 'running') {
+    $.ui.toast(`${reason} — restarting the dev servers`, { timeoutMs: 6000 })
+    await restartAll($)
+  }
+}
+
 function ensureTick($: EngineInterface) {
   tick ??= $.clock.every(TICK_MS, async () => {
+    const current = await read($, dev)
+
+    if (current.status !== 'stopped' || current.procs.length > 0) {
+      await refreshRepo($).catch(() => undefined)
+      await watchLayout($).catch(() => undefined)
+    }
+
     if (anyActive()) {
       const at = await $.clock.now()
       await update($, now, () => at)
@@ -825,10 +973,15 @@ async function readPorts($: EngineInterface) {
   }
 }
 
+async function loadAppUrl($: EngineInterface) {
+  const text = await $.fs.read(`${siteDir || project.dir}/.env`).catch(() => '')
+  await update($, appUrl, () => parseEnvValue(String(text), 'APP_URL') || null)
+}
+
 async function loadConfigured($: EngineInterface) {
   const text = await $.fs.read(`${project.dir}/.env`).catch(() => '')
   await update($, configured, () => parseEnvPort(String(text)))
-  await update($, appUrl, () => parseEnvValue(String(text), 'APP_URL') || null)
+  await loadAppUrl($)
 }
 
 async function processEnv($: EngineInterface): Promise<Record<string, string>> {
@@ -1104,6 +1257,8 @@ async function startAll($: EngineInterface): Promise<boolean> {
     await resetDetection($)
   }
 
+  await refreshRepo($).catch(() => undefined)
+  await watchLayout($).catch(() => undefined)
   ensureTick($)
   runners.forEach(runner => {
     runner.attempts = 0
@@ -1261,6 +1416,8 @@ async function carryState($: EngineInterface) {
     detected: await read($, detected),
     tunnel: await read($, tunnel),
     onlyErrors: await read($, onlyErrors),
+    repo: await read($, repo),
+    layout: await read($, layout),
   }
 }
 
@@ -1273,6 +1430,8 @@ async function restoreState($: EngineInterface, carried: Awaited<ReturnType<type
   await update($, detected, () => carried.detected)
   await update($, tunnel, () => carried.tunnel)
   await update($, onlyErrors, () => carried.onlyErrors)
+  await update($, repo, () => carried.repo)
+  await update($, layout, () => carried.layout)
   await update($, isOpen, () => false)
   $.ui.status(undefined)
 }
@@ -1519,7 +1678,7 @@ export const layoutEntry = (entry: Entry, withName: boolean, labelWidth: number,
     ansi,
     level,
     message,
-    isError: !badge && !ansi && ERROR_PATTERN.test(text),
+    isError: !badge && !ansi && hasError(text),
     time,
     name,
     extra,
@@ -1590,7 +1749,9 @@ export const register: Register = (on, options) => {
   extraHosts = parseHosts(String(options.tunnelHosts ?? ''))
 
   on('session.start', async ($, e, next) => {
-    const dir = String(options.projectDir ?? '').trim() || (await $.session.cwd())
+    const root = (await $.session.repo().catch(() => null))?.root
+    const prefix = root ? ((await $.process.run(['git', 'rev-parse', '--show-prefix']).catch(() => null))?.stdout.trim().replace(/\/$/, '') ?? '') : ''
+    const dir = String(options.projectDir ?? '').trim() || (root ? (prefix ? `${root}/${prefix}` : root) : await $.session.cwd())
 
     project = { dir, name: dir.split('/').filter(Boolean).pop() ?? dir }
     await $.command.register({
@@ -1604,6 +1765,8 @@ export const register: Register = (on, options) => {
     tick?.cancel()
     tick = null
     await dropAttached($)
+    await refreshRepo($).catch(() => undefined)
+    await watchLayout($).catch(() => undefined)
     ensureTick($)
 
     return next(e)
@@ -1626,6 +1789,19 @@ export const register: Register = (on, options) => {
     await releaseAll($, Math.max(0, Math.min(TERM_GRACE_MS, next.budget.remainingMs - 500)))
 
     return next(e)
+  })
+
+  on('tool.call', { tool: ['EnterWorktree', 'ExitWorktree'] }, async ($, e, next) => {
+    const result = await next(e)
+
+    $.clock.after(0, () => {
+      void refreshRepo($)
+        .catch(() => undefined)
+        .then(() => watchLayout($))
+        .catch(() => undefined)
+    })
+
+    return result
   })
 
   on('prompt.submit', async ($, e, next) => {
@@ -1675,25 +1851,42 @@ export const register: Register = (on, options) => {
     const color = statusColor(current.status, up, total)
     const port = effectivePort(await readPorts($))
     const base = await read($, appUrl)
+    const where = await read($, repo)
     const detail = current.status === 'stopped' ? ' stopped' : ` · ${up}/${total} up`
+    const host = siteHost(base)
+    const nameLinks = Boolean(where?.worktree && host && current.status !== 'stopped')
+    const siteLabel = host ? `${host} ↗` : port ? `:${port} ↗` : '↗ site'
+    const showSite = current.status !== 'stopped' && !nameLinks
+    const openSite = () => openUrl($, siteUrl(base, port))
+    const site = showSite ? 1 + siteLabel.length : 0
+    const errorText = errors > 0 ? ` · ${errors} err` : ''
+    const used = ' dev'.length + 1 + site + detail.length + errorText.length + BAND_RESERVE + (nameLinks ? 2 : 0)
+    const shown = fitWhere(where, e.props.bodyColumns - used)
 
     return stack(
       <Box>
         <Text color={color} dimColor={color === undefined}>●</Text>
         <Text bold>{' dev'}</Text>
-        {current.status === 'stopped' ? null : (
+        {showSite ? (
           <Box marginLeft={1}>
             <Button
               key="dev-site"
-              label={port ? `:${port} ↗` : '↗ site'}
+              label={siteLabel}
               plain
               dimColor
-              onPress={() => openUrl($, siteUrl(base, port))}
+              onPress={openSite}
             />
           </Box>
-        )}
+        ) : null}
         <Text dimColor>{detail}</Text>
-        {errors > 0 ? <Text color="red">{` · ${errors} err`}</Text> : null}
+        {errors > 0 ? <Text color="red">{errorText}</Text> : null}
+        {shown.branch ? <Text dimColor>{` · ⎇ ${shown.branch}`}</Text> : null}
+        {shown.worktree ? <Text dimColor>{' · ⌂ '}</Text> : null}
+        {shown.worktree && nameLinks ? (
+          <Button key="dev-worktree" label={`${shown.worktree} ↗`} plain dimColor onPress={openSite} />
+        ) : shown.worktree ? (
+          <Text dimColor>{shown.worktree}</Text>
+        ) : null}
         <Text>  </Text>
         <Button key="dev-toggle" label={open ? '−' : '+'} plain dimColor onPress={() => togglePane($)} />
       </Box>,
@@ -1841,7 +2034,6 @@ export const register: Register = (on, options) => {
               <Text color={stateColor} dimColor={stateColor === undefined}>{proc.state === 'up' ? '  ●' : '  ○'}</Text>
               <Text color={stateColor} dimColor={stateColor === undefined}>{` ${proc.state.padEnd(10)}`}</Text>
               <Text dimColor>{(proc.state === 'up' ? uptime(proc.startedAt, at) : '').padEnd(6)}</Text>
-              {proc.restarts > 0 ? <Text dimColor>{`↻${proc.restarts}  `}</Text> : null}
               {proc.errors > 0 ? <Text color="red">{`⚠${proc.errors}`}</Text> : null}
             </Box>
           )

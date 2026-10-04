@@ -10,7 +10,7 @@
     "projectDir": {
       "type": "string",
       "title": "Project folder",
-      "description": "Absolute path of the Laravel app whose `php artisan dev` this manages. Empty uses the session's folder.",
+      "description": "Absolute path of the Laravel app whose `php artisan dev` this manages. Empty uses the session's folder; when the session starts inside a worktree, the same folder in the main checkout.",
       "default": ""
     },
     "tunnelHosts": {
