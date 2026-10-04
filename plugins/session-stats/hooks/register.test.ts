@@ -1,4 +1,7 @@
+import type { On } from 'claude-code'
 import { expect, test } from 'claude-code/testing'
+
+import type { Snapshot } from '../types'
 
 import {
   addTurn,
@@ -11,6 +14,7 @@ import {
   limitLabel,
   limitTitle,
   modelShares,
+  parseEffort,
   prettyModel,
   tokensLabel,
 } from './register'
@@ -53,6 +57,52 @@ test('effort levels map to icons, numbers and nothing', () => {
   expect(['low', 'medium', 'high', 'xhigh', 'max'].map(effortIcon)).toEqual(['○', '◐', '●', '◉', '◈'])
   expect(effortIcon(8000)).toBe('8000')
   expect(effortIcon(null)).toBe('')
+})
+
+test('an /effort argument names a level only when it is one', () => {
+  expect(parseEffort(' High ')).toBe('high')
+  expect(parseEffort('xhigh')).toBe('xhigh')
+  expect(parseEffort('')).toBeNull()
+  expect(parseEffort('auto')).toBeNull()
+})
+
+const stubState = (on: On) => {
+  const written: Record<string, unknown> = {}
+
+  on('state.get', (_$, e) => ({ value: { value: written[e.key], version: 1 } }))
+  on('state.set', (_$, e) => {
+    written[e.key] = e.value
+
+    return { value: { isSet: true, version: 1 } }
+  })
+
+  return written
+}
+
+test('a model switch updates the shown model without waiting for a turn', async ($, on) => {
+  on('session.usage', () => ({ value: { context: { percent: 10, tokens: 1000, window: 200_000 }, rateLimits: [] } as never }))
+  let model = 'claude-opus-5-5'
+  on('session.model', () => ({ value: model }))
+  on('command.run', () => {
+    model = 'claude-sonnet-5-5'
+
+    return { text: '' }
+  })
+  const written = stubState(on)
+
+  await $.command.run({ command: 'model', args: 'sonnet' })
+
+  expect((written.snapshot as Snapshot | undefined)?.model).toBe('claude-sonnet-5-5')
+  expect(written.effort).toBeNull()
+})
+
+test('/effort with a level updates the icon without waiting for a turn', async ($, on) => {
+  on('command.run', () => ({ text: '' }))
+  const written = stubState(on)
+
+  await $.command.run({ command: 'effort', args: 'low' })
+
+  expect(written.effort).toBe('low')
 })
 
 test('durations read as hours, minutes or seconds', () => {

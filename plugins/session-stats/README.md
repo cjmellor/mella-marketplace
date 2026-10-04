@@ -17,9 +17,12 @@ Sonnet 5.5  ◼◼◼◼◼ 12%  5h 8% (34m)  W 13% (4d 2h)  +
 
 - The model, as `/model` shows it, then an icon for the reasoning effort:
   `○` low, `◐` medium, `●` high, `◉` xhigh, `◈` max (a number if the effort is
-  a token budget). It is read from each request, so it appears after the first
-  turn and a `/effort` change shows from the next one. Models without an effort
-  setting show no icon.
+  a token budget). A `/model` switch shows at once and clears the effort icon
+  until the new model's first turn; one made elsewhere (the Alt+P picker, a
+  fallback, the IDE) shows from the next turn. The effort is read from each
+  request, so it appears after the first turn; `/effort <level>` shows at once,
+  while a level picked from a menu shows from the next turn. Models without an
+  effort setting show no icon.
 - A five-square bar and percentage for the context window.
 - Each rate-limit window (`5h`, `W`) with its percentage and the time until it
   resets. Windows appear once the first response has reported them, and only on
@@ -52,7 +55,8 @@ of finished turns, not the API's own time.
 ## Freshness
 
 The figures are pushed by the engine after each turn and whenever a rate-limit
-window moves a whole point. Reset countdowns tick once a minute.
+window moves a whole point, and refreshed straight after `/model` and `/effort`.
+Reset countdowns tick once a minute.
 
 ## Install
 
@@ -87,6 +91,9 @@ hook returned a tree that does not validate` line.
 - Only one hook can draw the band. This mod asks the hooks beneath it for their
   tree and stacks its own row on top, so it composes with `git-diff` only when it
   loads first. A mod that draws without asking replaces this one.
+- Mods get no event for a model or effort change, only for the `/model` and
+  `/effort` commands. A level `/effort` refuses or lowers for the model still
+  shows as typed until the next turn corrects it.
 - The pane is a snapshot taken when it opens (press `r` to refresh).
 - A hot reload of the mod closes an open pane.
 - The terminal draws a button under the pointer as an inverted block. That comes

@@ -12,10 +12,17 @@ const now = atom({ plugin: 'session-stats', key: 'now' } as const, 0)
 const totals = atom({ plugin: 'session-stats', key: 'totals' } as const, emptyTotals)
 const effort = atom({ plugin: 'session-stats', key: 'effort' } as const, null)
 
-const EFFORT_ICONS: Record<string, string> = { low: '○', medium: '◐', high: '●', xhigh: '◉', max: '◈' }
+const EFFORT_LEVELS = ['low', 'medium', 'high', 'xhigh', 'max'] as const
+const EFFORT_ICONS: Record<(typeof EFFORT_LEVELS)[number], string> = { low: '○', medium: '◐', high: '●', xhigh: '◉', max: '◈' }
 
 export const effortIcon = (level: string | number | null): string =>
-  level === null ? '' : (EFFORT_ICONS[String(level)] ?? String(level))
+  level === null ? '' : (EFFORT_ICONS[String(level) as keyof typeof EFFORT_ICONS] ?? String(level))
+
+export const parseEffort = (args: string): string | null => {
+  const level = args.trim().toLowerCase()
+
+  return (EFFORT_LEVELS as readonly string[]).includes(level) ? level : null
+}
 
 const BAR_CELLS = 5
 const PANE_BAR_CELLS = 20
@@ -218,6 +225,29 @@ export const register: Register = on => {
     await openPane($)
 
     return { text: 'Session stats pane opened.' }
+  })
+
+  on('command.run', { command: 'effort' }, async ($, e, next) => {
+    const result = await next(e)
+    const level = parseEffort(e.args)
+
+    if (level) {
+      await update($, effort, () => level)
+    }
+
+    return result
+  })
+
+  on('command.run', { command: 'model' }, async ($, e, next) => {
+    const before = (await read($, snapshot))?.model
+    const result = await next(e)
+    await refresh($).catch(() => undefined)
+
+    if ((await read($, snapshot))?.model !== before) {
+      await update($, effort, () => null)
+    }
+
+    return result
   })
 
   on('ui.close', async ($, e, next) => {
