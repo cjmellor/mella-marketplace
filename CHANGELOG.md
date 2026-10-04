@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.19.0] - 2026-10-04
+
+### Added
+
+- **`worktree-ready` mod** (new plugin → v0.1.0). Makes a new git worktree of a Laravel app ready with no hands. When Claude enters a worktree it clones `vendor`, `node_modules` and `public/build` from the main checkout with copy-on-write, installs or rebuilds only what changed, copies `.env`, and links and secures the worktree as its own `.test` site through Valet or Herd. Leaving the worktree unlinks the site, and removes the worktree and its branch once the work is merged.
+- **Branch and worktree in the `artisan-dev` band** (artisan-dev → v0.2.0). The band shows the git branch and, inside a worktree, its name. The site link is labelled with the `APP_URL` host (`kandu.test ↗`), and inside a worktree the worktree name opens that worktree's own site.
+- **`artisan-dev` restarts on branch and worktree changes.** The dev servers restart, with a toast, when the main checkout's branch changes or a worktree is added or removed, straight after Claude enters or exits a worktree.
+- **Instant model and effort in `session-stats`** (session-stats → v0.2.0). `/model` and `/effort <level>` update the band at once instead of after the next turn.
+
+### Changed
+
+- **`artisan-dev` counts only real errors.** A line counts as an error only when it carries a severity marker (a log level, an exception class or an error phrase), so file names and paths containing "error" no longer raise the count.
+- **`artisan-dev` drops the restart counts** (`↻N`) from the band, pane and status.
+
+### Fixed
+
+- **`artisan-dev` keeps working after a worktree is removed,** and toasts coloured error lines again.
+
 ## [1.18.1] - 2026-10-04
 
 ### Changed

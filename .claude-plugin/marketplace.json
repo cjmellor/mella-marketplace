@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "Mella's curated marketplace of Claude Code plugins",
-    "version": "1.18.1"
+    "version": "1.19.0"
   },
   "plugins": [
     {
@@ -37,7 +37,7 @@
       "name": "session-stats",
       "source": "./plugins/session-stats",
       "description": "A Claude Code mod that shows the model, context fill and rate-limit usage above the prompt, with a pane that breaks the context window down.",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "keywords": ["usage", "context", "rate-limit", "mod", "statusline"],
       "license": "MIT"
     },
@@ -45,7 +45,7 @@
       "name": "artisan-dev",
       "source": "./plugins/artisan-dev",
       "description": "Runs `php artisan dev` for a Laravel project and manages it from a pane: per-process logs, restart and stop controls, port override, site and tunnel links.",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "keywords": ["laravel", "dev-server", "pane", "mod", "artisan"],
       "license": "MIT"
     },
