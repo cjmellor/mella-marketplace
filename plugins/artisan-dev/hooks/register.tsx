@@ -6,6 +6,7 @@ import type { Dev, DevEvent, Entry, Proc } from '../types'
 const DEFAULT_PORT = 8000
 const PANE = 'dev'
 const PLUGIN = 'artisan-dev'
+const RESEED_MS = 500
 const PANE_ROWS = 28
 const MAX_LINES = 300
 const MAX_FEED = 600
@@ -1250,6 +1251,32 @@ async function openUrl($: EngineInterface, url: string) {
   await $.process.run(['open', url])
 }
 
+async function carryState($: EngineInterface) {
+  return {
+    dev: await read($, dev),
+    selected: await read($, selected),
+    override: await read($, override),
+    configured: await read($, configured),
+    appUrl: await read($, appUrl),
+    detected: await read($, detected),
+    tunnel: await read($, tunnel),
+    onlyErrors: await read($, onlyErrors),
+  }
+}
+
+async function restoreState($: EngineInterface, carried: Awaited<ReturnType<typeof carryState>>) {
+  await update($, dev, () => carried.dev)
+  await update($, selected, () => carried.selected)
+  await update($, override, () => carried.override)
+  await update($, configured, () => carried.configured)
+  await update($, appUrl, () => carried.appUrl)
+  await update($, detected, () => carried.detected)
+  await update($, tunnel, () => carried.tunnel)
+  await update($, onlyErrors, () => carried.onlyErrors)
+  await update($, isOpen, () => false)
+  $.ui.status(undefined)
+}
+
 async function dropAttached($: EngineInterface) {
   await update($, attached, () => null)
   $.ui.status(undefined)
@@ -1582,7 +1609,18 @@ export const register: Register = (on, options) => {
     return next(e)
   })
 
+  // /clear resets this plugin's state after session.end and fires no session.start, so the state is put back from a timer.
   on('session.end', async ($, e, next) => {
+    if (e.reason === 'clear') {
+      const carried = await carryState($)
+
+      $.clock.after(RESEED_MS, () => {
+        void restoreState($, carried)
+      })
+
+      return next(e)
+    }
+
     tick?.cancel()
     tick = null
     await releaseAll($, Math.max(0, Math.min(TERM_GRACE_MS, next.budget.remainingMs - 500)))
