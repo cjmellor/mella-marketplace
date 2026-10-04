@@ -29,7 +29,7 @@ A worktree that a session starts in (`claude --worktree`) is set up the same way
 
 Whether the exit keeps or removes the worktree, the site is unsecured and unlinked, and the mod checks that it is gone from `links`.
 
-If the exit kept the worktree, the mod then removes the folder and its branch when there is nothing to lose: no uncommitted changes, and the branch is merged into the default branch. Anything else is kept, and you are told why once. The same check runs for leftovers at the start of the next session, along with links whose folder no longer exists. Only worktrees under the project's `.claude/worktrees/` that the mod set up are ever removed.
+If the exit kept the worktree, the mod then removes the folder and its branch when there is nothing to lose: no uncommitted changes, and the branch has commits of its own that are merged into the default branch. A worktree you entered and left without committing is kept. Anything else is kept, and you are told why once. The same check runs for leftovers at the start of the next session, along with the links of worktrees whose folder no longer exists. Only worktrees under the project's `.claude/worktrees/` that the mod set up are ever removed.
 
 ## Options
 

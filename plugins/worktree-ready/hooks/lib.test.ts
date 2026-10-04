@@ -17,6 +17,7 @@ test('a link name never contains the word worktree', () => {
   expect(linkName('My Worktree App', 'Fix_Login', '/p/x')).toBe('my-app-fix-login')
   expect(linkName('kandu', 'worktree', '/p/worktree')).not.toContain('worktree')
   expect(linkName('kandu', 'worktree', '/p/worktree')).not.toBe('kandu')
+  expect(linkName('kandu', 'worktreefix', '/p/x')).toBe('kandu-fix')
 })
 
 test('a link name stays a valid host label', () => {

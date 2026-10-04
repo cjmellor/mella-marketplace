@@ -22,6 +22,10 @@ type World = {
   sameAssets: boolean
   dirty: boolean
   merged: boolean
+  head: string
+  statusFails: boolean
+  locked: boolean
+  lockMade: number
 }
 
 const table = (sites: Site[]) =>
@@ -50,6 +54,10 @@ const world = (overrides: Partial<World> = {}): World => ({
   sameAssets: true,
   dirty: false,
   merged: true,
+  head: 'abc123',
+  statusFails: false,
+  locked: false,
+  lockMade: 0,
   ...overrides,
 })
 
@@ -68,10 +76,17 @@ const respond = (w: World, argv: string[], cwd: string | undefined) => {
     return ok()
   }
   if (line.startsWith('cmp -s')) return w.sameLocks ? ok() : fail()
-  if (line === 'git rev-parse HEAD') return ok('abc123\n')
+  if (line === 'git rev-parse HEAD') return ok(`${w.head}\n`)
+  if (line.startsWith('mkdir ')) return w.locked ? fail() : ok()
+  if (line.startsWith('rmdir ')) {
+    w.locked = false
+
+    return ok()
+  }
+  if (line.startsWith('stat -f')) return ok(`${w.lockMade}\n`)
   if (line === 'git rev-parse --abbrev-ref HEAD') return ok('worktree-purring-crafting\n')
   if (line.startsWith(`git -C ${MAIN} diff --quiet`)) return w.sameAssets ? ok() : fail()
-  if (line === 'git status --porcelain') return ok(w.dirty ? ' M app/User.php\n' : '')
+  if (line === 'git status --porcelain') return w.statusFails ? fail() : ok(w.dirty ? ' M app/User.php\n' : '')
   if (line.startsWith('git -C') && line.includes('symbolic-ref')) return ok('origin/main\n')
   if (line.includes('merge-base --is-ancestor')) return w.merged ? ok() : fail()
   if (line.includes('worktree remove')) {
@@ -167,16 +182,6 @@ test('entering a worktree whose lockfiles and assets match main clones, installs
   expect(w.toasts).toContain(`Worktree ready at https://${NAME}.test`)
 })
 
-test('the site name never contains the word worktree', async ($, on) => {
-  const w = world()
-
-  stubWorld(on, w)
-  on('tool.call', enter(w))
-  await $.tool.call({ tool: 'EnterWorktree', name: 'purring-crafting' })
-
-  expect(w.sites.map(site => site.name).join(' ')).not.toContain('worktree')
-})
-
 test('a changed lockfile installs, and changed frontend sources rebuild', async ($, on) => {
   const w = world({ sameLocks: false, sameAssets: false })
 
@@ -242,6 +247,7 @@ test('leaving a finished worktree unsecures, unlinks, verifies, then removes the
   stubWorld(on, w)
   on('tool.call', ($: unknown, e: { tool: string }) => (e.tool === 'EnterWorktree' ? enter(w)() : leave('keep')()))
   await $.tool.call({ tool: 'EnterWorktree', name: 'purring-crafting' })
+  w.head = 'def456'
   w.calls.length = 0
   await $.tool.call({ tool: 'ExitWorktree', action: 'keep' })
 
@@ -254,7 +260,7 @@ test('leaving a finished worktree unsecures, unlinks, verifies, then removes the
 })
 
 test('leaving a worktree with uncommitted work unlinks it but keeps the folder, and says so once', async ($, on) => {
-  const w = world({ dirty: true })
+  const w = world({ dirty: true, head: 'def456' })
 
   stubWorld(on, w)
   on('tool.call', ($: unknown, e: { tool: string }) => (e.tool === 'EnterWorktree' ? enter(w)() : leave('keep')()))
@@ -268,7 +274,7 @@ test('leaving a worktree with uncommitted work unlinks it but keeps the folder, 
 })
 
 test('a worktree whose branch is not merged is kept', async ($, on) => {
-  const w = world({ merged: false })
+  const w = world({ merged: false, head: 'def456' })
 
   stubWorld(on, w)
   on('tool.call', ($: unknown, e: { tool: string }) => (e.tool === 'EnterWorktree' ? enter(w)() : leave('keep')()))
@@ -277,6 +283,76 @@ test('a worktree whose branch is not merged is kept', async ($, on) => {
 
   expect(ran(w, `git -C ${MAIN} worktree remove`)).toEqual([])
   expect(w.toasts.some(text => text.includes('not merged'))).toBe(true)
+})
+
+test('a worktree entered and left without a commit is kept, even though main contains its branch', async ($, on) => {
+  const w = world()
+
+  stubWorld(on, w)
+  on('tool.call', ($: unknown, e: { tool: string }) => (e.tool === 'EnterWorktree' ? enter(w)() : leave('keep')()))
+  await $.tool.call({ tool: 'EnterWorktree', name: 'purring-crafting' })
+  await $.tool.call({ tool: 'ExitWorktree', action: 'keep' })
+
+  expect(w.sites.some(site => site.name === NAME)).toBe(false)
+  expect(ran(w, `git -C ${MAIN} worktree remove`)).toEqual([])
+})
+
+test('a worktree whose git status fails is treated as dirty', async ($, on) => {
+  const w = world({ head: 'def456', statusFails: true })
+
+  stubWorld(on, w)
+  on('tool.call', ($: unknown, e: { tool: string }) => (e.tool === 'EnterWorktree' ? enter(w)() : leave('keep')()))
+  await $.tool.call({ tool: 'EnterWorktree', name: 'purring-crafting' })
+  await $.tool.call({ tool: 'ExitWorktree', action: 'keep' })
+
+  expect(ran(w, `git -C ${MAIN} worktree remove`)).toEqual([])
+})
+
+test('an entry the tool denied or failed sets nothing up', async ($, on) => {
+  const w = world()
+
+  stubWorld(on, w)
+  on('tool.call', () => ({ deny: 'not allowed' }))
+  await $.tool.call({ tool: 'EnterWorktree', name: 'x' })
+
+  expect(w.calls.filter(call => call.startsWith('valet') || call.startsWith('cp'))).toEqual([])
+  expect(w.store.size).toBe(0)
+})
+
+test('a setup lock left behind by a dead session is cleared once it is old', async ($, on) => {
+  const w = world({ locked: true, lockMade: 1 })
+
+  const clock = mock.clock(on)
+
+  await clock.advance(3_600_000)
+  stubWorld(on, w)
+  on('tool.call', enter(w))
+  await $.tool.call({ tool: 'EnterWorktree', name: 'purring-crafting' })
+
+  expect(ran(w, 'valet link ')).toEqual([`valet link ${NAME}`])
+})
+
+test('a fresh lock means another setup is running', async ($, on) => {
+  const clock = mock.clock(on)
+  const w = world({ locked: true, lockMade: Math.floor((await clock.now()) / 1000) })
+
+  stubWorld(on, w)
+  on('tool.call', enter(w))
+  await $.tool.call({ tool: 'EnterWorktree', name: 'purring-crafting' })
+
+  expect(ran(w, 'valet link ')).toEqual([])
+  expect(w.toasts.some(text => text.includes('another setup'))).toBe(true)
+})
+
+test('main\'s storage link is recreated in the worktree', async ($, on) => {
+  const w = world()
+
+  w.files.add(`${MAIN}/public/storage`)
+  stubWorld(on, w)
+  on('tool.call', enter(w))
+  await $.tool.call({ tool: 'EnterWorktree', name: 'purring-crafting' })
+
+  expect(ran(w, 'php artisan storage:link')).toEqual(['php artisan storage:link'])
 })
 
 test('when the tool removes the worktree itself, only the link and record are cleaned up', async ($, on) => {
@@ -306,19 +382,19 @@ test('an exit the tool refused leaves the link and the record alone', async ($, 
   expect(w.store.get(`wt:${TREE}`)).toMatchObject({ state: 'active', link: NAME })
 })
 
-test('the next session removes a worktree that was left exited and drops links to folders that are gone', async ($, on) => {
-  const w = world()
+test('the next session removes a worktree that was left exited, and leaves links it did not make alone', async ($, on) => {
+  const w = world({ head: 'def456' })
   const clock = mock.clock(on)
 
   w.sites.push({ name: 'kandu-ghost', path: `${MAIN}/.claude/worktrees/ghost`, secure: true })
   w.sites.push({ name: NAME, path: TREE, secure: true })
-  w.store.set(`wt:${TREE}`, { path: TREE, main: MAIN, project: 'kandu', branch: 'worktree-purring-crafting', tool: 'valet', link: NAME, state: 'exited', notified: false })
+  w.store.set(`wt:${TREE}`, { path: TREE, main: MAIN, project: 'kandu', branch: 'worktree-purring-crafting', base: 'abc123', tool: 'valet', link: NAME, state: 'exited', notified: false })
   stubWorld(on, w)
   on('session.start', () => ({ cwd: MAIN }))
   await $.session.start({ surface: 'terminal', isInteractive: true, cwd: MAIN })
   await clock.advance(1)
 
-  expect(w.sites.map(site => site.name)).toEqual(['kandu'])
+  expect(w.sites.map(site => site.name)).toEqual(['kandu', 'kandu-ghost'])
   expect(ran(w, `git -C ${MAIN} worktree remove`)).toEqual([`git -C ${MAIN} worktree remove ${TREE}`])
   expect(w.store.has(`wt:${TREE}`)).toBe(false)
 })

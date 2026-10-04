@@ -6,6 +6,9 @@ import type { Link, Tool, WorktreeInfo, WorktreeRecord } from './lib'
 const PLUGIN = 'worktree-ready'
 const PREFIX = 'wt:'
 const LONG_MS = 600_000
+const SITE_MS = 120_000
+const STALE_LOCK_MS = 1_800_000
+const NOT_LINKED = { url: null, linked: false }
 
 let configured = 'auto'
 
@@ -20,6 +23,12 @@ async function run($: EngineInterface, argv: string[], cwd?: string, timeoutMs?:
 }
 
 const passed = (outcome: Outcome): boolean => outcome.exitCode === 0
+
+const deniedOrFailed = (result: unknown): boolean => {
+  const shape = result as { deny?: unknown; isError?: unknown } | undefined
+
+  return shape?.deny !== undefined || shape?.isError === true
+}
 
 const outcomeOf = (result: unknown): { worktreePath?: string; action?: string } | undefined => {
   const inner = (result as { result?: unknown } | undefined)?.result
@@ -83,7 +92,7 @@ async function listLinks($: EngineInterface, tool: Tool): Promise<Link[] | null>
   return passed(listed) ? parseLinks(listed.stdout) : null
 }
 
-async function copyEnv($: EngineInterface, main: string, top: string) {
+async function copyEnv($: EngineInterface, { main, top }: WorktreeInfo) {
   if ((await has($, top, '.env')) || !(await has($, main, '.env'))) {
     return
   }
@@ -91,25 +100,31 @@ async function copyEnv($: EngineInterface, main: string, top: string) {
   await $.fs.write(`${top}/.env`, String(await $.fs.read(`${main}/.env`)))
 }
 
-async function shareDatabase($: EngineInterface, main: string, top: string) {
-  const database = `${main}/database/database.sqlite`
-
-  if (!(await has($, top, '.env')) || !(await $.fs.exists(database))) {
+async function editEnv($: EngineInterface, top: string, change: (text: string) => string) {
+  if (!(await has($, top, '.env'))) {
     return
   }
 
   const text = String(await $.fs.read(`${top}/.env`))
-  const shared = shareSqlite(text, database)
+  const next = change(text)
 
-  if (shared !== text) {
-    await $.fs.write(`${top}/.env`, shared)
+  if (next !== text) {
+    await $.fs.write(`${top}/.env`, next)
   }
 }
 
-async function setAppUrl($: EngineInterface, top: string, url: string) {
-  if (await has($, top, '.env')) {
-    await $.fs.write(`${top}/.env`, setEnv(String(await $.fs.read(`${top}/.env`)), 'APP_URL', url))
+async function shareDatabase($: EngineInterface, { main, top }: WorktreeInfo) {
+  const database = `${main}/database/database.sqlite`
+
+  if (await $.fs.exists(database)) {
+    await editEnv($, top, text => shareSqlite(text, database))
   }
+}
+
+const setAppUrl = ($: EngineInterface, top: string, url: string) => editEnv($, top, text => setEnv(text, 'APP_URL', url))
+
+async function lockDiffers($: EngineInterface, { main, top }: WorktreeInfo, file: string): Promise<boolean> {
+  return !passed(await run($, ['cmp', '-s', `${main}/${file}`, `${top}/${file}`]))
 }
 
 async function hasBuildScript($: EngineInterface, top: string): Promise<boolean> {
@@ -126,7 +141,7 @@ async function hasBuildScript($: EngineInterface, top: string): Promise<boolean>
   }
 }
 
-async function needsBuild($: EngineInterface, main: string, top: string): Promise<boolean> {
+async function needsBuild($: EngineInterface, { main, top }: WorktreeInfo): Promise<boolean> {
   if (!(await has($, top, 'public/build'))) {
     return true
   }
@@ -147,16 +162,16 @@ async function link($: EngineInterface, tool: Tool, name: string, top: string): 
   if (clash && clash.path !== top) {
     toast($, `${name} already points at ${clash.path}, so it was not linked`, 10_000)
 
-    return { url: null, linked: false }
+    return NOT_LINKED
   }
 
-  if (!clash && !passed(await run($, [tool, 'link', name], top))) {
+  if (!clash && !passed(await run($, [tool, 'link', name], top, SITE_MS))) {
     toast($, `${tool} link ${name} failed`, 10_000)
 
-    return { url: null, linked: false }
+    return NOT_LINKED
   }
 
-  await run($, [tool, 'secure', name], top)
+  await run($, [tool, 'secure', name], top, SITE_MS)
 
   const site = (await listLinks($, tool))?.find(entry => entry.name === name && entry.path === top)
 
@@ -169,6 +184,7 @@ async function link($: EngineInterface, tool: Tool, name: string, top: string): 
 
 async function setUp($: EngineInterface, info: WorktreeInfo): Promise<string | null> {
   const { top, main } = info
+  const earlier = await readRecord($, top)
 
   say($, 'cloning dependencies')
 
@@ -178,16 +194,16 @@ async function setUp($: EngineInterface, info: WorktreeInfo): Promise<string | n
     }
   }
 
-  await copyEnv($, main, top)
-  await shareDatabase($, main, top)
+  await copyEnv($, info)
+  await shareDatabase($, info)
 
-  if (await has($, top, 'composer.lock')) {
-    const differs = !passed(await run($, ['cmp', '-s', `${main}/composer.lock`, `${top}/composer.lock`]))
+  if ((await has($, top, 'composer.lock')) && ((await lockDiffers($, info, 'composer.lock')) || !(await has($, top, 'vendor')))) {
+    say($, 'composer install')
+    must(await run($, ['composer', 'install', '--no-interaction'], top, LONG_MS), 'composer install failed')
+  }
 
-    if (differs || !(await has($, top, 'vendor'))) {
-      say($, 'composer install')
-      must(await run($, ['composer', 'install', '--no-interaction'], top, LONG_MS), 'composer install failed')
-    }
+  if ((await has($, main, 'public/storage')) && !(await has($, top, 'public/storage'))) {
+    await run($, ['php', 'artisan', 'storage:link'], top)
   }
 
   const locks: string[] = []
@@ -200,16 +216,12 @@ async function setUp($: EngineInterface, info: WorktreeInfo): Promise<string | n
 
   const plan = jsPlan(locks, await hasBuildScript($, top))
 
-  if (plan.install && plan.lock) {
-    const differs = !passed(await run($, ['cmp', '-s', `${main}/${plan.lock}`, `${top}/${plan.lock}`]))
-
-    if (differs || !(await has($, top, 'node_modules'))) {
-      say($, `${plan.install[0]} install`)
-      must(await run($, plan.install, top, LONG_MS), `${plan.install[0]} install failed`)
-    }
+  if (plan.install && plan.lock && ((await lockDiffers($, info, plan.lock)) || !(await has($, top, 'node_modules')))) {
+    say($, `${plan.install[0]} install`)
+    must(await run($, plan.install, top, LONG_MS), `${plan.install[0]} install failed`)
   }
 
-  if (plan.build && (await needsBuild($, main, top))) {
+  if (plan.build && (await needsBuild($, info))) {
     say($, 'building assets')
     must(await run($, plan.build, top, LONG_MS), 'asset build failed')
   }
@@ -217,15 +229,16 @@ async function setUp($: EngineInterface, info: WorktreeInfo): Promise<string | n
   const project = basename(main)
   const name = linkName(project, basename(top), top)
   const tool = await findTool($, true)
-  const site = tool ? await link($, tool, name, top) : { url: null, linked: false }
+  const site = tool ? await link($, tool, name, top) : NOT_LINKED
 
   if (site.url) {
     await setAppUrl($, top, site.url)
   }
 
   const branch = (await run($, ['git', 'rev-parse', '--abbrev-ref', 'HEAD'], top)).stdout.trim()
+  const head = (await run($, ['git', 'rev-parse', 'HEAD'], top)).stdout.trim()
 
-  await saveRecord($, { path: top, main, project, branch, tool, link: site.linked ? name : null, state: 'active', notified: false })
+  await saveRecord($, { path: top, main, project, branch, base: earlier?.base ?? head, tool, link: site.linked ? name : null, state: 'active', notified: false })
   toast($, site.url ? `Worktree ready at ${site.url}` : 'Worktree ready', 15_000)
 
   if (site.url) {
@@ -233,6 +246,22 @@ async function setUp($: EngineInterface, info: WorktreeInfo): Promise<string | n
   }
 
   return site.url
+}
+
+async function claimLock($: EngineInterface, lock: string): Promise<boolean> {
+  if (passed(await run($, ['mkdir', lock]))) {
+    return true
+  }
+
+  const made = Number((await run($, ['stat', '-f', '%m', lock])).stdout.trim())
+
+  if (!(made > 0) || (await $.clock.now()) - made * 1000 < STALE_LOCK_MS) {
+    return false
+  }
+
+  await run($, ['rmdir', lock])
+
+  return passed(await run($, ['mkdir', lock]))
 }
 
 async function provision($: EngineInterface, dir: string): Promise<string | null> {
@@ -244,8 +273,8 @@ async function provision($: EngineInterface, dir: string): Promise<string | null
 
   const lock = `${info.gitDir}/${PLUGIN}.lock`
 
-  if (!passed(await run($, ['mkdir', lock]))) {
-    toast($, `another setup is running, or a lock was left behind at ${lock}`, 10_000)
+  if (!(await claimLock($, lock))) {
+    toast($, `another setup is running at ${lock}`, 10_000)
 
     return null
   }
@@ -262,13 +291,17 @@ async function provision($: EngineInterface, dir: string): Promise<string | null
   }
 }
 
+async function dropSite($: EngineInterface, tool: Tool, name: string) {
+  await run($, [tool, 'unsecure', name], undefined, SITE_MS)
+  await run($, [tool, 'unlink', name], undefined, SITE_MS)
+}
+
 async function unlink($: EngineInterface, record: WorktreeRecord): Promise<WorktreeRecord> {
   if (!record.link || !record.tool) {
     return record
   }
 
-  await run($, [record.tool, 'unsecure', record.link])
-  await run($, [record.tool, 'unlink', record.link])
+  await dropSite($, record.tool, record.link)
 
   if ((await listLinks($, record.tool))?.some(site => site.name === record.link)) {
     toast($, `${record.link} is still linked after unlink`, 10_000)
@@ -281,6 +314,12 @@ async function unlink($: EngineInterface, record: WorktreeRecord): Promise<Workt
 
 async function isMerged($: EngineInterface, record: WorktreeRecord): Promise<boolean> {
   if (!record.branch || record.branch === 'HEAD') {
+    return false
+  }
+
+  const head = await run($, ['git', 'rev-parse', 'HEAD'], record.path)
+
+  if (!passed(head) || (record.base !== undefined && head.stdout.trim() === record.base)) {
     return false
   }
 
@@ -310,11 +349,12 @@ async function tryRemove($: EngineInterface, record: WorktreeRecord) {
     return
   }
 
-  const dirty = (await run($, ['git', 'status', '--porcelain'], record.path)).stdout.trim() !== ''
+  const status = await run($, ['git', 'status', '--porcelain'], record.path)
+  const dirty = !passed(status) || status.stdout.trim() !== ''
 
   if (dirty || !(await isMerged($, record))) {
     if (!record.notified) {
-      toast($, `${basename(record.path)} was kept: ${dirty ? 'it has uncommitted changes' : 'its commits are not merged into the default branch'}`, 10_000)
+      toast($, `${basename(record.path)} was kept: ${dirty ? 'it has uncommitted changes' : 'its work is not merged into the default branch'}`, 10_000)
       await saveRecord($, { ...record, notified: true })
     }
 
@@ -327,9 +367,10 @@ async function tryRemove($: EngineInterface, record: WorktreeRecord) {
     return
   }
 
-  await run($, ['git', '-C', record.main, 'branch', '-d', record.branch])
+  const branchDropped = passed(await run($, ['git', '-C', record.main, 'branch', '-d', record.branch]))
+
   await forget()
-  toast($, `Removed the finished worktree ${basename(record.path)}`)
+  toast($, branchDropped ? `Removed the finished worktree ${basename(record.path)}` : `Removed ${basename(record.path)}, but its branch ${record.branch} was kept`, 10_000)
 }
 
 async function retire($: EngineInterface, top: string, removedByTool: boolean) {
@@ -373,15 +414,6 @@ async function sweep($: EngineInterface) {
       await tryRemove($, await unlink($, record))
     }
   }
-
-  const tool = await findTool($, false)
-
-  for (const site of tool ? ((await listLinks($, tool)) ?? []) : []) {
-    if (underWorktrees(main, site.path) && !(await $.fs.exists(site.path))) {
-      await run($, [tool as Tool, 'unsecure', site.name])
-      await run($, [tool as Tool, 'unlink', site.name])
-    }
-  }
 }
 
 export const register: Register = (on, options) => {
@@ -399,11 +431,15 @@ export const register: Register = (on, options) => {
 
   on('tool.call', { tool: 'EnterWorktree' }, async ($, e, next) => {
     const result = await next(e)
-    const entered = outcomeOf(result)?.worktreePath ?? (await $.session.cwd())
+    const entered = outcomeOf(result)?.worktreePath
+
+    if (!entered || deniedOrFailed(result)) {
+      return result
+    }
 
     const url = await provision($, entered).catch(() => null)
 
-    if (!url || (result as { deny?: string }).deny !== undefined) {
+    if (!url) {
       return result
     }
 

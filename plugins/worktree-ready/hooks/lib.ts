@@ -9,6 +9,7 @@ export type WorktreeRecord = {
   main: string
   project: string
   branch: string
+  base?: string
   tool: Tool | null
   link: string | null
   state: 'active' | 'exited'
@@ -22,8 +23,6 @@ export const TOOLS: Tool[] = ['valet', 'herd']
 // Never add public/hot or bootstrap/cache: they carry main's dev-server URL and its cached config.
 export const CLONES = ['vendor', 'node_modules', 'public/build']
 
-export const ASSET_INPUTS = ['resources', 'package.json', 'vite.config.*', 'tailwind.config.*', 'postcss.config.*', 'tsconfig.json']
-
 const ANSI = /\u001b\[[0-9;]*m/g
 
 const JS_LOCKS: [string, string[], string[]][] = [
@@ -36,13 +35,15 @@ const JS_LOCKS: [string, string[], string[]][] = [
 
 export const JS_LOCK_FILES = JS_LOCKS.map(([lock]) => lock)
 
+export const ASSET_INPUTS = ['resources', 'package.json', ...JS_LOCK_FILES, 'vite.config.*', 'tailwind.config.*', 'postcss.config.*', 'tsconfig.json']
+
 const slug = (text: string): string =>
   text
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
 
-const parts = (text: string): string[] => slug(text).split('-').filter(part => part && part !== 'worktree')
+const parts = (text: string): string[] => slug(text).replaceAll('worktree', '').split('-').filter(Boolean)
 
 const hash = (text: string): string => {
   let value = 5381
