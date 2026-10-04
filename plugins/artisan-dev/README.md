@@ -37,14 +37,18 @@ Override it for the session with `--port=8111`, `-p 8111` or `port=8111` on `/de
 
 The override lives in the session only. It is never written to `.env`, and it stays in place until you reset it or the session ends.
 
-The site opens at `APP_URL` from `.env`. A loopback `APP_URL` (`localhost` or `127.0.0.1`) gets the real port; any other host is used as written. The band link is labelled with that host (`kandu.test ↗`), or `:port ↗` for a loopback `APP_URL`. In a worktree with a hosted `APP_URL`, the worktree name in the band is the link instead.
+The site opens at `APP_URL` from the `.env` of the checkout the session is in, so inside a worktree it is that worktree's site. A loopback `APP_URL` (`localhost` or `127.0.0.1`) gets the real port; any other host is used as written. The band link is labelled with that host (`kandu.test ↗`), or `:port ↗` for a loopback `APP_URL`. In a worktree with a hosted `APP_URL`, the worktree name in the band is the link instead.
 
 ### The pane
 
 - **Processes** — `0` shows the combined log in arrival order; `1`–`9` pick a process. The up and down arrows move between process names only.
 - **Toolbar** — `x` Stop all (or `s` Start all), `r` Restart all, `t` Restart one (the selected process), `o` Open site, `u` Copy tunnel (shown once a tunnel URL is known), `c` Copy log, `a` Ask Claude (attaches the state and recent output to your next prompt; the button then reads `asked ✓` and drops it).
 - **Log** — keeps each process's own colours, wraps long lines, and scrolls with the wheel, page keys, Home and End. `e` (or the button in the Log divider) shows only errors and warnings.
-- **Band above the prompt** — status dot, a clickable `:PORT ↗` link that opens the site, how many processes are up, an error count, the git branch (`⎇`) and, inside a linked git worktree, its name (`⌂`). `+` and `−` open and close the pane.
+- **Band above the prompt** — status dot, a clickable site link (see Port above), how many processes are up, an error count, the git branch (`⎇`) and, inside a linked git worktree, its name (`⌂`). `+` and `−` open and close the pane.
+
+### Errors
+
+A line counts as an error only when it carries a severity marker where its tool puts one: a log level such as Laravel's `local.ERROR:` or a Pail `ERROR` badge, an exception class at the start of the message, or a phrase such as `Fatal error`, `Uncaught` or Vite's `Internal server error:`. A word like `error` inside a file name, path or ordinary sentence doesn't count. Matching lines raise the band's error count, turn red in the log and show a toast.
 
 ### Crashes and restarts
 
@@ -62,7 +66,7 @@ When a process prints a public tunnel URL (Cloudflare, ngrok, Expose and Herd sh
 
 | Setting | Default | Purpose |
 |---------|---------|---------|
-| `projectDir` | empty | Absolute path of the Laravel app. Empty uses the session's folder. |
+| `projectDir` | empty | Absolute path of the Laravel app. Empty uses the session's folder; when the session starts inside a worktree, the same folder in the main checkout. |
 | `tunnelHosts` | empty | Extra comma-separated domains to treat as a tunnel, for providers not built in. |
 
 ## Development
