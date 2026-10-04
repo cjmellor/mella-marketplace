@@ -26,6 +26,22 @@
       "license": "MIT"
     },
     {
+      "name": "git-diff",
+      "source": "./plugins/git-diff",
+      "description": "A mod that shows uncommitted git changes above the prompt: files changed, green added and red removed counts, and a GitHub-style bar.",
+      "version": "0.1.0",
+      "keywords": ["git", "diff", "mod", "statusline"],
+      "license": "MIT"
+    },
+    {
+      "name": "usage",
+      "source": "./plugins/usage",
+      "description": "A Claude Code mod that shows the model, context fill and rate-limit usage above the prompt, with a pane that breaks the context window down.",
+      "version": "0.1.0",
+      "keywords": ["usage", "context", "rate-limit", "mod", "statusline"],
+      "license": "MIT"
+    },
+    {
       "name": "artisan-dev",
       "source": "./plugins/artisan-dev",
       "description": "Runs `php artisan dev` for a Laravel project and manages it from a pane: per-process logs, restart and stop controls, port override, site and tunnel links.",
