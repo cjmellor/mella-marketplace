@@ -17,6 +17,12 @@ const EFFORT_ICONS: Record<string, string> = { low: '○', medium: '◐', high: 
 export const effortIcon = (level: string | number | null): string =>
   level === null ? '' : (EFFORT_ICONS[String(level)] ?? String(level))
 
+export const parseEffort = (args: string): string | null => {
+  const level = args.trim().toLowerCase()
+
+  return level in EFFORT_ICONS ? level : null
+}
+
 const BAR_CELLS = 5
 const PANE_BAR_CELLS = 20
 const PANE = 'usage'
@@ -218,6 +224,24 @@ export const register: Register = on => {
     await openPane($)
 
     return { text: 'Session stats pane opened.' }
+  })
+
+  on('command.run', { command: 'effort' }, async ($, e, next) => {
+    const result = await next(e)
+    const level = parseEffort(e.args)
+
+    if (level) {
+      await update($, effort, () => level)
+    }
+
+    return result
+  })
+
+  on('command.run', { command: 'model' }, async ($, e, next) => {
+    const result = await next(e)
+    await refresh($)
+
+    return result
   })
 
   on('ui.close', async ($, e, next) => {
