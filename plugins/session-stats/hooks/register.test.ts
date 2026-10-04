@@ -1,4 +1,7 @@
+import type { On } from 'claude-code'
 import { expect, test } from 'claude-code/testing'
+
+import type { Snapshot } from '../types'
 
 import {
   addTurn,
@@ -63,13 +66,14 @@ test('an /effort argument names a level only when it is one', () => {
   expect(parseEffort('auto')).toBeNull()
 })
 
-const recordWrites = (on: (name: string, hook: (...args: any[]) => unknown) => void) => {
+const stubState = (on: On) => {
   const written: Record<string, unknown> = {}
 
-  on('state.set', ($: unknown, e: { key: string; value: unknown }) => {
+  on('state.get', (_$, e) => ({ value: { value: written[e.key], version: 1 } }))
+  on('state.set', (_$, e) => {
     written[e.key] = e.value
 
-    return { isSet: true, version: 1 }
+    return { value: { isSet: true, version: 1 } }
   })
 
   return written
@@ -84,16 +88,17 @@ test('a model switch updates the shown model without waiting for a turn', async 
 
     return { text: '' }
   })
-  const written = recordWrites(on)
+  const written = stubState(on)
 
   await $.command.run({ command: 'model', args: 'sonnet' })
 
-  expect((written.snapshot as { model: string } | undefined)?.model).toBe('claude-sonnet-5-5')
+  expect((written.snapshot as Snapshot | undefined)?.model).toBe('claude-sonnet-5-5')
+  expect(written.effort).toBeNull()
 })
 
 test('/effort with a level updates the icon without waiting for a turn', async ($, on) => {
   on('command.run', () => ({ text: '' }))
-  const written = recordWrites(on)
+  const written = stubState(on)
 
   await $.command.run({ command: 'effort', args: 'low' })
 

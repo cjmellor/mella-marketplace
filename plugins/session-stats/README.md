@@ -17,7 +17,9 @@ Sonnet 5.5  ◼◼◼◼◼ 12%  5h 8% (34m)  W 13% (4d 2h)  +
 
 - The model, as `/model` shows it, then an icon for the reasoning effort:
   `○` low, `◐` medium, `●` high, `◉` xhigh, `◈` max (a number if the effort is
-  a token budget). A `/model` switch shows at once; one made elsewhere (a fallback, the IDE) shows from the next turn. The effort is read from each
+  a token budget). A `/model` switch shows at once and clears the effort icon
+  until the new model's first turn; one made elsewhere (the Alt+P picker, a
+  fallback, the IDE) shows from the next turn. The effort is read from each
   request, so it appears after the first turn; `/effort <level>` shows at once,
   while a level picked from a menu shows from the next turn. Models without an
   effort setting show no icon.
