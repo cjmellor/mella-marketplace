@@ -36,6 +36,8 @@ export type DevEvent = {
   time?: string
 }
 
+export type Repo = { branch: string | null; worktree: string | null }
+
 declare module 'claude-code' {
   interface PluginState {
     'artisan-dev': {
@@ -51,6 +53,7 @@ declare module 'claude-code' {
       onlyErrors: boolean
       tunnel: { label: string; url: string } | null
       attached: { label: string | null; text: string } | null
+      repo: Repo | null
     }
   }
 }

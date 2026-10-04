@@ -1,7 +1,7 @@
 import type { EngineInterface, Register, RenderChildren } from 'claude-code'
 import { atom, read, update } from 'claude-code'
 
-import type { Dev, DevEvent, Entry, Proc } from '../types'
+import type { Dev, DevEvent, Entry, Proc, Repo } from '../types'
 
 const DEFAULT_PORT = 8000
 const PANE = 'dev'
@@ -53,6 +53,7 @@ const scrollBack = atom({ plugin: 'artisan-dev', key: 'back' } as const, 0)
 const onlyErrors = atom({ plugin: 'artisan-dev', key: 'onlyErrors' } as const, false)
 const tunnel = atom({ plugin: 'artisan-dev', key: 'tunnel' } as const, null)
 const attached = atom({ plugin: 'artisan-dev', key: 'attached' } as const, null)
+const repo = atom({ plugin: 'artisan-dev', key: 'repo' } as const, null)
 
 const WHEEL_STEP = 3
 
@@ -201,13 +202,25 @@ export const statusText = (name: string, current: Dev, port: number | null, url:
   const width = Math.max(...current.procs.map(proc => proc.label.length))
   const rows = current.procs.map(proc => {
     const age = proc.state === 'up' ? `  ${uptime(proc.startedAt, at)}` : ''
-    const restarts = proc.restarts > 0 ? `  ↻${proc.restarts}` : ''
     const errors = proc.errors > 0 ? `  ⚠${proc.errors}` : ''
 
-    return `${proc.state === 'up' ? '●' : '○'} ${proc.label.padEnd(width)}  ${proc.state}${age}${restarts}${errors}`
+    return `${proc.state === 'up' ? '●' : '○'} ${proc.label.padEnd(width)}  ${proc.state}${age}${errors}`
   })
 
   return [`${name} dev — ${current.status} · ${up}/${total} up${port ? ` · :${port}` : ''}`, url, ...rows].join('\n')
+}
+
+export const parseRepo = (revParse: string, branch: string, head: string): Repo | null => {
+  const [toplevel, gitDir, commonDir] = revParse.split('\n').map(line => line.trim())
+
+  if (!toplevel || !gitDir || !commonDir) {
+    return null
+  }
+
+  return {
+    branch: branch.trim() || head.trim() || null,
+    worktree: gitDir === commonDir ? null : (toplevel.split('/').filter(Boolean).pop() ?? null),
+  }
 }
 
 export const matchProcess = (procs: { label: string }[], target: string): string | null => {
@@ -804,8 +817,23 @@ async function emit($: EngineInterface, input: DevEvent | DevEvent[]) {
   }
 }
 
+async function refreshRepo($: EngineInterface) {
+  const cwd = project.dir
+  const top = await $.process.run(['git', 'rev-parse', '--path-format=absolute', '--show-toplevel', '--git-dir', '--git-common-dir'], { cwd })
+  const named = top.exitCode === 0 ? await $.process.run(['git', 'branch', '--show-current'], { cwd }) : null
+  const detached = named && !named.stdout.trim() ? await $.process.run(['git', 'rev-parse', '--short', 'HEAD'], { cwd }) : null
+  const next = named ? parseRepo(top.stdout, named.stdout, detached?.stdout ?? '') : null
+  const last = await read($, repo)
+
+  if (last?.branch !== next?.branch || last?.worktree !== next?.worktree) {
+    await update($, repo, () => next)
+  }
+}
+
 function ensureTick($: EngineInterface) {
   tick ??= $.clock.every(TICK_MS, async () => {
+    await refreshRepo($)
+
     if (anyActive()) {
       const at = await $.clock.now()
       await update($, now, () => at)
@@ -1261,6 +1289,7 @@ async function carryState($: EngineInterface) {
     detected: await read($, detected),
     tunnel: await read($, tunnel),
     onlyErrors: await read($, onlyErrors),
+    repo: await read($, repo),
   }
 }
 
@@ -1273,6 +1302,7 @@ async function restoreState($: EngineInterface, carried: Awaited<ReturnType<type
   await update($, detected, () => carried.detected)
   await update($, tunnel, () => carried.tunnel)
   await update($, onlyErrors, () => carried.onlyErrors)
+  await update($, repo, () => carried.repo)
   await update($, isOpen, () => false)
   $.ui.status(undefined)
 }
@@ -1604,6 +1634,7 @@ export const register: Register = (on, options) => {
     tick?.cancel()
     tick = null
     await dropAttached($)
+    await refreshRepo($)
     ensureTick($)
 
     return next(e)
@@ -1675,6 +1706,7 @@ export const register: Register = (on, options) => {
     const color = statusColor(current.status, up, total)
     const port = effectivePort(await readPorts($))
     const base = await read($, appUrl)
+    const where = await read($, repo)
     const detail = current.status === 'stopped' ? ' stopped' : ` · ${up}/${total} up`
 
     return stack(
@@ -1694,6 +1726,8 @@ export const register: Register = (on, options) => {
         )}
         <Text dimColor>{detail}</Text>
         {errors > 0 ? <Text color="red">{` · ${errors} err`}</Text> : null}
+        {where?.branch ? <Text dimColor>{` · ⎇ ${where.branch}`}</Text> : null}
+        {where?.worktree ? <Text dimColor>{` · ⌂ ${where.worktree}`}</Text> : null}
         <Text>  </Text>
         <Button key="dev-toggle" label={open ? '−' : '+'} plain dimColor onPress={() => togglePane($)} />
       </Box>,
@@ -1841,7 +1875,6 @@ export const register: Register = (on, options) => {
               <Text color={stateColor} dimColor={stateColor === undefined}>{proc.state === 'up' ? '  ●' : '  ○'}</Text>
               <Text color={stateColor} dimColor={stateColor === undefined}>{` ${proc.state.padEnd(10)}`}</Text>
               <Text dimColor>{(proc.state === 'up' ? uptime(proc.startedAt, at) : '').padEnd(6)}</Text>
-              {proc.restarts > 0 ? <Text dimColor>{`↻${proc.restarts}  `}</Text> : null}
               {proc.errors > 0 ? <Text color="red">{`⚠${proc.errors}`}</Text> : null}
             </Box>
           )

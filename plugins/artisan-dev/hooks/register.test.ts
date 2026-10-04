@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import type { Dev } from '../types'
-import { applyEvent, colorFor, applySgr, buttonGrid, buttonText, clearedLog, color256, afterCarriage, findTunnelUrl, layoutEntry, isProblem, logText, matchProcess, parseHosts, statusText, visibleEntries, effectivePort, gridRows, hasAnsi, logRoom, nextBack, judgeExit, noProcess, parseAnsi, wrapRanges, wrapSegments, parseDevArgs, statusColor, parseDevList, parseEnvPort, parseEnvValue, siteUrl, promptText, rule, spawnArgv, toPort, PGID_MARK, splitLines, stripAnsi, summarise, uptime, wrapText } from './register'
+import { parseRepo, applyEvent, colorFor, applySgr, buttonGrid, buttonText, clearedLog, color256, afterCarriage, findTunnelUrl, layoutEntry, isProblem, logText, matchProcess, parseHosts, statusText, visibleEntries, effectivePort, gridRows, hasAnsi, logRoom, nextBack, judgeExit, noProcess, parseAnsi, wrapRanges, wrapSegments, parseDevArgs, statusColor, parseDevList, parseEnvPort, parseEnvValue, siteUrl, promptText, rule, spawnArgv, toPort, PGID_MARK, splitLines, stripAnsi, summarise, uptime, wrapText } from './register'
 
 const empty: Dev = { status: 'running', procs: [], feed: [], notes: [] }
 const started = applyEvent(empty, { type: 'start', label: 'server', command: 'php artisan serve', pid: 10, time: '2026-10-03T16:00:00.000Z' })
@@ -443,4 +443,11 @@ test('an ANSI entry is laid out on its visible text, not its escape codes', () =
   const coloured = { label: 'vite', text: `${ESC}[32m${'x'.repeat(100)}${ESC}[0m`, at: 0 }
 
   expect(layoutEntry(coloured, false, 6, 62)).toMatchObject({ ansi: true, level: null, count: 2 })
+})
+
+test('parses the branch and names a linked worktree', () => {
+  expect(parseRepo('/a/kandu\n/a/kandu/.git\n/a/kandu/.git', 'main\n', '')).toEqual({ branch: 'main', worktree: null })
+  expect(parseRepo('/a/kandu/.claude/worktrees/fix\n/a/kandu/.git/worktrees/fix\n/a/kandu/.git', 'fix-x\n', '')).toEqual({ branch: 'fix-x', worktree: 'fix' })
+  expect(parseRepo('/a/kandu\n/a/kandu/.git\n/a/kandu/.git', '', 'abc123\n')).toEqual({ branch: 'abc123', worktree: null })
+  expect(parseRepo('', '', '')).toBeNull()
 })
