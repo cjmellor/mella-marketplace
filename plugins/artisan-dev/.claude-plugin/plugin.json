@@ -1,5 +1,5 @@
 {
-  "name": "dev-manager",
+  "name": "artisan-dev",
   "version": "0.1.0",
   "description": "Runs `php artisan dev` for a Laravel project and manages it from a pane: per-process logs, restart and stop controls, port override, site and tunnel links.",
   "author": { "name": "Chris Mellor" },

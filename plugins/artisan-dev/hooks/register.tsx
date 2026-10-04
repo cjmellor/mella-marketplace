@@ -39,17 +39,17 @@ const ANSI_PATTERN = /\u001b\[[0-9;:?]*[ -/]*[@-~]/g
 
 const emptyDev: Dev = { status: 'stopped', procs: [], feed: [], notes: [] }
 
-const dev = atom({ plugin: 'dev-manager', key: 'dev' } as const, emptyDev)
-const selected = atom({ plugin: 'dev-manager', key: 'selected' } as const, null)
-const now = atom({ plugin: 'dev-manager', key: 'now' } as const, 0)
-const isOpen = atom({ plugin: 'dev-manager', key: 'isOpen' } as const, false)
-const override = atom({ plugin: 'dev-manager', key: 'override' } as const, null)
-const configured = atom({ plugin: 'dev-manager', key: 'configured' } as const, null)
-const appUrl = atom({ plugin: 'dev-manager', key: 'appUrl' } as const, null)
-const detected = atom({ plugin: 'dev-manager', key: 'detected' } as const, null)
-const scrollBack = atom({ plugin: 'dev-manager', key: 'back' } as const, 0)
-const onlyErrors = atom({ plugin: 'dev-manager', key: 'onlyErrors' } as const, false)
-const tunnel = atom({ plugin: 'dev-manager', key: 'tunnel' } as const, null)
+const dev = atom({ plugin: 'artisan-dev', key: 'dev' } as const, emptyDev)
+const selected = atom({ plugin: 'artisan-dev', key: 'selected' } as const, null)
+const now = atom({ plugin: 'artisan-dev', key: 'now' } as const, 0)
+const isOpen = atom({ plugin: 'artisan-dev', key: 'isOpen' } as const, false)
+const override = atom({ plugin: 'artisan-dev', key: 'override' } as const, null)
+const configured = atom({ plugin: 'artisan-dev', key: 'configured' } as const, null)
+const appUrl = atom({ plugin: 'artisan-dev', key: 'appUrl' } as const, null)
+const detected = atom({ plugin: 'artisan-dev', key: 'detected' } as const, null)
+const scrollBack = atom({ plugin: 'artisan-dev', key: 'back' } as const, 0)
+const onlyErrors = atom({ plugin: 'artisan-dev', key: 'onlyErrors' } as const, false)
+const tunnel = atom({ plugin: 'artisan-dev', key: 'tunnel' } as const, null)
 
 const WHEEL_STEP = 3
 

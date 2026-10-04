@@ -26,8 +26,8 @@
       "license": "MIT"
     },
     {
-      "name": "dev-manager",
-      "source": "./plugins/dev-manager",
+      "name": "artisan-dev",
+      "source": "./plugins/artisan-dev",
       "description": "Runs `php artisan dev` for a Laravel project and manages it from a pane: per-process logs, restart and stop controls, port override, site and tunnel links.",
       "version": "0.1.0",
       "keywords": ["laravel", "dev-server", "pane", "mod", "artisan"],

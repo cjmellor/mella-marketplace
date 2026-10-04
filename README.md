@@ -26,9 +26,9 @@ Automatic, always-on cross-session memory. grain quietly records what you did an
 
 It runs entirely through three lifecycle hooks (SessionStart recalls, PreCompact checkpoints, SessionEnd finalises). Capture is pattern-based and local — **no model calls, no API keys, no cost, no network.** Memory lives as plain Markdown under `~/.claude/grain/`, keyed per project. See [`plugins/grain/README.md`](plugins/grain/README.md) for controls and details.
 
-### dev-manager
+### artisan-dev
 
-A Claude Code mod that runs a Laravel app's `php artisan dev` from inside the session and manages it from a pane. `/dev` starts every process, shows per-process logs with their own colours, and offers controls to restart, stop, filter to errors, copy logs or the tunnel URL, and open the site. It reads the port from `.env`, takes a `--port` override, and restarts crashed processes. See [`plugins/dev-manager/README.md`](plugins/dev-manager/README.md) for commands and settings.
+A Claude Code mod that runs a Laravel app's `php artisan dev` from inside the session and manages it from a pane. `/dev` starts every process, shows per-process logs with their own colours, and offers controls to restart, stop, filter to errors, copy logs or the tunnel URL, and open the site. It reads the port from `.env`, takes a `--port` override, and restarts crashed processes. See [`plugins/artisan-dev/README.md`](plugins/artisan-dev/README.md) for commands and settings.
 
 ## Installation
 
@@ -51,7 +51,7 @@ A Claude Code mod that runs a Laravel app's `php artisan dev` from inside the se
 /plugin install grain@mella-marketplace
 
 # Or the Laravel dev-server manager mod
-/plugin install dev-manager@mella-marketplace
+/plugin install artisan-dev@mella-marketplace
 ```
 
 **3. Start using:**

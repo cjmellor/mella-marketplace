@@ -38,7 +38,7 @@ export type DevEvent = {
 
 declare module 'claude-code' {
   interface PluginState {
-    'dev-manager': {
+    'artisan-dev': {
       dev: Dev
       selected: string | null
       now: number

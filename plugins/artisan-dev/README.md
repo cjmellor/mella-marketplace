@@ -1,8 +1,8 @@
-# dev-manager
+# artisan-dev
 
 Run a Laravel app's `php artisan dev` from inside Claude Code and manage it without leaving the session.
 
-dev-manager is a Claude Code mod. `/dev` starts every process `php artisan dev` would, opens a pane with their logs and controls, and keeps a one-line status band above the prompt while they run.
+artisan-dev is a Claude Code mod. `/dev` starts every process `php artisan dev` would, opens a pane with their logs and controls, and keeps a one-line status band above the prompt while they run.
 
 ## Requirements
 
@@ -68,8 +68,8 @@ When a process prints a public tunnel URL (Cloudflare, ngrok, Expose and Herd sh
 The pure logic (argument parsing, `.env` reading, ANSI handling, layout, exit policy) is covered by `hooks/register.test.ts`:
 
 ```bash
-claude plugin validate plugins/dev-manager
-claude plugin test plugins/dev-manager
+claude plugin validate plugins/artisan-dev
+claude plugin test plugins/artisan-dev
 ```
 
 The process lifecycle (starting, stopping, restarting) isn't covered by tests, because the test kit can't mock process spawning.
