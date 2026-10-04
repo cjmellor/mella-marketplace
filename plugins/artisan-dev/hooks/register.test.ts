@@ -32,7 +32,6 @@ test('tracks start, output, errors and restarts', () => {
 
   expect(output.procs[0]?.lines).toHaveLength(1)
   expect(failed.procs[0]?.errors).toBe(1)
-  expect(restarted.procs[0]?.restarts).toBe(1)
   expect(restarted.procs[0]?.pid).toBe(11)
   expect(restarted.procs[0]?.errors).toBe(0)
   expect(summarise(failed)).toEqual({ total: 1, up: 1, errors: 1 })
@@ -254,7 +253,6 @@ test('clearing the log empties every log and error count but keeps the process r
   expect(cleared.procs.map(proc => proc.label)).toEqual(['server'])
   expect(cleared.procs[0]?.lines).toEqual([])
   expect(cleared.procs[0]?.errors).toBe(0)
-  expect(cleared.procs[0]?.restarts).toBe(busy.procs[0]?.restarts)
 })
 
 test('reads APP_URL from .env, skipping commented lines and trailing comments', () => {
@@ -457,6 +455,8 @@ test('names the host of a site that is not loopback', () => {
   expect(siteHost('https://kandu.test:8443/app')).toBe('kandu.test')
   expect(siteHost('http://localhost:8000')).toBeNull()
   expect(siteHost('http://127.0.0.1')).toBeNull()
+  expect(siteHost('http://0.0.0.0:8000')).toBeNull()
+  expect(siteHost('http://[::1]:8000')).toBeNull()
   expect(siteHost(null)).toBeNull()
 })
 
@@ -467,6 +467,7 @@ test('fits the branch and worktree into the room the band has left', () => {
   expect(fitWhere(both, 30)).toEqual({ branch: 'worktree-…', worktree: 'purring-c…' })
   expect(fitWhere({ branch: 'main', worktree: null }, 30)).toEqual({ branch: 'main', worktree: '' })
   expect(fitWhere(null, 30)).toEqual({ branch: '', worktree: '' })
+  expect(fitWhere(both, 8)).toEqual({ branch: '', worktree: '' })
 })
 
 test('a branch switch or a worktree appearing counts as a change, the first read does not', () => {

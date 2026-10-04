@@ -103,24 +103,28 @@ export const parseEnvPort = (text: string): number | null => {
   return value === null ? null : toPort(value)
 }
 
-export const siteHost = (appUrl: string | null): string | null => {
-  const host = appUrl?.match(/^https?:\/\/([^/:?#]+)/i)?.[1]
+const LOOPBACK_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', '[::1]']
 
-  return host && host !== 'localhost' && host !== '127.0.0.1' ? host : null
+const parseSite = (appUrl: string | null): { scheme: string; host: string; rest: string } | null => {
+  const found = appUrl?.match(/^(https?:\/\/)(\[[^\]]+\]|[^/:?#]+)(:\d+)?(.*)$/i)
+
+  return found ? { scheme: found[1] ?? '', host: found[2] ?? '', rest: found[4] ?? '' } : null
+}
+
+export const siteHost = (appUrl: string | null): string | null => {
+  const host = parseSite(appUrl)?.host
+
+  return host && !LOOPBACK_HOSTS.includes(host) ? host : null
 }
 
 export const siteUrl = (appUrl: string | null, port: number | null): string => {
-  const fallback = `http://127.0.0.1:${port ?? DEFAULT_PORT}`
-  const found = appUrl?.match(/^(https?:\/\/)([^/:?#]+)(:\d+)?(.*)$/i)
+  const site = parseSite(appUrl)
 
-  if (!appUrl || !found) {
-    return fallback
+  if (!appUrl || !site) {
+    return `http://127.0.0.1:${port ?? DEFAULT_PORT}`
   }
 
-  const [, scheme = '', host = '', , rest = ''] = found
-  const isLoopback = host === 'localhost' || host === '127.0.0.1'
-
-  return isLoopback && port ? `${scheme}${host}:${port}${rest}` : appUrl
+  return LOOPBACK_HOSTS.includes(site.host) && port ? `${site.scheme}${site.host}:${port}${site.rest}` : appUrl
 }
 
 export const DEV_ACTIONS = [
@@ -222,6 +226,8 @@ export const statusText = (name: string, current: Dev, port: number | null, url:
   return [`${name} dev — ${current.status} · ${up}/${total} up${port ? ` · :${port}` : ''}`, url, ...rows].join('\n')
 }
 
+const pickBranch = (named: string, detached: string): string => named.trim() || detached.trim()
+
 export const parseRepo = (revParse: string, branch: string, head: string): Repo | null => {
   const [toplevel, gitDir, commonDir] = revParse.split('\n').map(line => line.trim())
 
@@ -230,34 +236,34 @@ export const parseRepo = (revParse: string, branch: string, head: string): Repo 
   }
 
   return {
-    branch: branch.trim() || head.trim() || null,
+    branch: pickBranch(branch, head) || null,
     worktree: gitDir === commonDir ? null : (toplevel.split('/').filter(Boolean).pop() ?? null),
   }
 }
 
 export const fitWhere = (where: Repo | null, room: number): { branch: string; worktree: string } => {
-  const items = [
-    ['⎇', where?.branch],
-    ['⌂', where?.worktree],
-  ].filter((item): item is [string, string] => Boolean(item[1]))
-  let left = room - items.length * WHERE_OVERHEAD
-  let remaining = items.length
-  const shown = new Map<string, string>()
+  const names = [where?.branch ?? '', where?.worktree ?? '']
+  const order = names.flatMap((name, slot) => (name ? [{ name, slot }] : [])).sort((a, b) => a.name.length - b.name.length)
+  const shown = ['', '']
+  let left = room - order.length * WHERE_OVERHEAD
 
-  for (const [icon, name] of [...items].sort((a, b) => a[1].length - b[1].length)) {
-    const cap = Math.max(1, Math.floor(left / remaining))
-    const text = name.length > cap ? `${name.slice(0, Math.max(0, cap - 1))}…` : name
-
-    shown.set(icon, text)
-    left -= text.length
-    remaining -= 1
+  if (left < order.length) {
+    return { branch: '', worktree: '' }
   }
 
-  return { branch: shown.get('⎇') ?? '', worktree: shown.get('⌂') ?? '' }
+  order.forEach(({ name, slot }, done) => {
+    const cap = Math.floor(left / (order.length - done))
+    const text = name.length > cap ? `${name.slice(0, cap - 1)}…` : name
+
+    shown[slot] = text
+    left -= text.length
+  })
+
+  return { branch: shown[0] ?? '', worktree: shown[1] ?? '' }
 }
 
 export const parseLayout = (branch: string, head: string, porcelain: string): Layout => ({
-  branch: branch.trim() || head.trim(),
+  branch: pickBranch(branch, head),
   worktrees: porcelain
     .split('\n')
     .filter(line => line.startsWith('worktree '))
@@ -622,7 +628,6 @@ export const applyEvent = (current: Dev, event: DevEvent): Dev => {
       pid: event.pid ?? 0,
       state: 'up',
       startedAt: at,
-      restarts: 0,
       errors: 0,
       lines: [],
     }
@@ -637,7 +642,6 @@ export const applyEvent = (current: Dev, event: DevEvent): Dev => {
             pid: event.pid ?? proc.pid,
             state: 'up',
             startedAt: at,
-            restarts: proc.restarts + 1,
             errors: 0,
           }))
         : [...current.procs, fresh],
@@ -783,6 +787,7 @@ const lastToast: Record<string, number> = {}
 let extraHosts: string[] = []
 let project = { dir: '', name: '' }
 let siteDir = ''
+let rewatch = false
 let tick: { cancel: () => void } | null = null
 let watching = false
 let view = { columns: 80, labelWidth: 6 }
@@ -839,7 +844,7 @@ async function observe($: EngineInterface, event: DevEvent, at: number) {
     }
   }
 
-  if (hasError(raw) && at - (lastToast[label] ?? 0) > TOAST_GAP_MS) {
+  if (hasError(stripAnsi(raw)) && at - (lastToast[label] ?? 0) > TOAST_GAP_MS) {
     lastToast[label] = at
     $.ui.toast(`${label} — ${stripAnsi(raw).trim().slice(0, 80)}`, { timeoutMs: 6000 })
   }
@@ -879,13 +884,21 @@ async function emit($: EngineInterface, input: DevEvent | DevEvent[]) {
   }
 }
 
+async function readBranch($: EngineInterface, cwd?: string) {
+  const git = (argv: string[]) => (cwd ? $.process.run(argv, { cwd }) : $.process.run(argv))
+  const named = await git(['git', 'branch', '--show-current'])
+  const detached = named.exitCode === 0 && !named.stdout.trim() ? await git(['git', 'rev-parse', '--short', 'HEAD']) : null
+
+  return { ok: named.exitCode === 0, named: named.stdout, detached: detached?.stdout ?? '' }
+}
+
 async function refreshRepo($: EngineInterface) {
-  const top = await $.process.run(['git', 'rev-parse', '--path-format=absolute', '--show-toplevel', '--git-dir', '--git-common-dir'])
-  const named = top.exitCode === 0 ? await $.process.run(['git', 'branch', '--show-current']) : null
-  const detached = named && !named.stdout.trim() ? await $.process.run(['git', 'rev-parse', '--short', 'HEAD']) : null
-  const next = named ? parseRepo(top.stdout, named.stdout, detached?.stdout ?? '') : null
+  const top = await $.process.run(['git', 'rev-parse', '--path-format=absolute', '--show-toplevel', '--git-dir', '--git-common-dir', '--show-prefix'])
+  const branch = top.exitCode === 0 ? await readBranch($) : null
+  const next = branch ? parseRepo(top.stdout, branch.named, branch.detached) : null
   const last = await read($, repo)
-  siteDir = top.stdout.split('\n')[0]?.trim() ?? ''
+  const [toplevel = '', , , prefix = ''] = top.stdout.split('\n').map(line => line.trim())
+  siteDir = prefix ? `${toplevel}/${prefix.replace(/\/$/, '')}` : toplevel
 
   await loadAppUrl($)
 
@@ -896,13 +909,18 @@ async function refreshRepo($: EngineInterface) {
 
 async function watchLayout($: EngineInterface) {
   if (watching) {
+    rewatch = true
+
     return
   }
 
   watching = true
 
   try {
-    await readLayout($)
+    do {
+      rewatch = false
+      await readLayout($)
+    } while (rewatch)
   } finally {
     watching = false
   }
@@ -910,15 +928,14 @@ async function watchLayout($: EngineInterface) {
 
 async function readLayout($: EngineInterface) {
   const cwd = project.dir
-  const named = await $.process.run(['git', 'branch', '--show-current'], { cwd })
-  const detached = named.exitCode === 0 && !named.stdout.trim() ? await $.process.run(['git', 'rev-parse', '--short', 'HEAD'], { cwd }) : null
+  const branch = await readBranch($, cwd)
   const listed = await $.process.run(['git', 'worktree', 'list', '--porcelain'], { cwd })
 
-  if (named.exitCode !== 0 || listed.exitCode !== 0) {
+  if (!branch.ok || listed.exitCode !== 0) {
     return
   }
 
-  const next = parseLayout(named.stdout, detached?.stdout ?? '', listed.stdout)
+  const next = parseLayout(branch.named, branch.detached, listed.stdout)
   const reason = layoutChange(await read($, layout), next)
   await update($, layout, () => next)
 
@@ -930,8 +947,12 @@ async function readLayout($: EngineInterface) {
 
 function ensureTick($: EngineInterface) {
   tick ??= $.clock.every(TICK_MS, async () => {
-    await refreshRepo($).catch(() => undefined)
-    await watchLayout($).catch(() => undefined)
+    const current = await read($, dev)
+
+    if (current.status !== 'stopped' || current.procs.length > 0) {
+      await refreshRepo($).catch(() => undefined)
+      await watchLayout($).catch(() => undefined)
+    }
 
     if (anyActive()) {
       const at = await $.clock.now()
@@ -1236,6 +1257,8 @@ async function startAll($: EngineInterface): Promise<boolean> {
     await resetDetection($)
   }
 
+  await refreshRepo($).catch(() => undefined)
+  await watchLayout($).catch(() => undefined)
   ensureTick($)
   runners.forEach(runner => {
     runner.attempts = 0
@@ -1726,7 +1749,9 @@ export const register: Register = (on, options) => {
   extraHosts = parseHosts(String(options.tunnelHosts ?? ''))
 
   on('session.start', async ($, e, next) => {
-    const dir = String(options.projectDir ?? '').trim() || (await $.session.repo().catch(() => null))?.root || (await $.session.cwd())
+    const root = (await $.session.repo().catch(() => null))?.root
+    const prefix = root ? ((await $.process.run(['git', 'rev-parse', '--show-prefix']).catch(() => null))?.stdout.trim().replace(/\/$/, '') ?? '') : ''
+    const dir = String(options.projectDir ?? '').trim() || (root ? (prefix ? `${root}/${prefix}` : root) : await $.session.cwd())
 
     project = { dir, name: dir.split('/').filter(Boolean).pop() ?? dir }
     await $.command.register({
@@ -1770,7 +1795,10 @@ export const register: Register = (on, options) => {
     const result = await next(e)
 
     $.clock.after(0, () => {
-      void watchLayout($).catch(() => undefined)
+      void refreshRepo($)
+        .catch(() => undefined)
+        .then(() => watchLayout($))
+        .catch(() => undefined)
     })
 
     return result
@@ -1826,9 +1854,10 @@ export const register: Register = (on, options) => {
     const where = await read($, repo)
     const detail = current.status === 'stopped' ? ' stopped' : ` · ${up}/${total} up`
     const host = siteHost(base)
-    const nameLinks = Boolean(where?.worktree && host)
+    const nameLinks = Boolean(where?.worktree && host && current.status !== 'stopped')
     const siteLabel = host ? `${host} ↗` : port ? `:${port} ↗` : '↗ site'
     const showSite = current.status !== 'stopped' && !nameLinks
+    const openSite = () => openUrl($, siteUrl(base, port))
     const site = showSite ? 1 + siteLabel.length : 0
     const errorText = errors > 0 ? ` · ${errors} err` : ''
     const used = ' dev'.length + 1 + site + detail.length + errorText.length + BAND_RESERVE + (nameLinks ? 2 : 0)
@@ -1845,7 +1874,7 @@ export const register: Register = (on, options) => {
               label={siteLabel}
               plain
               dimColor
-              onPress={() => openUrl($, siteUrl(base, port))}
+              onPress={openSite}
             />
           </Box>
         ) : null}
@@ -1853,8 +1882,8 @@ export const register: Register = (on, options) => {
         {errors > 0 ? <Text color="red">{errorText}</Text> : null}
         {shown.branch ? <Text dimColor>{` · ⎇ ${shown.branch}`}</Text> : null}
         {shown.worktree ? <Text dimColor>{' · ⌂ '}</Text> : null}
-        {shown.worktree && nameLinks && current.status !== 'stopped' ? (
-          <Button key="dev-worktree" label={`${shown.worktree} ↗`} plain dimColor onPress={() => openUrl($, siteUrl(base, port))} />
+        {shown.worktree && nameLinks ? (
+          <Button key="dev-worktree" label={`${shown.worktree} ↗`} plain dimColor onPress={openSite} />
         ) : shown.worktree ? (
           <Text dimColor>{shown.worktree}</Text>
         ) : null}

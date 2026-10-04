@@ -7,7 +7,6 @@ export type Proc = {
   pid: number
   state: ProcState
   startedAt: number
-  restarts: number
   errors: number
   lines: string[]
 }
