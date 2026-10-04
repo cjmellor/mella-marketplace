@@ -184,15 +184,32 @@ function squares(Text: TextElement, percent: number | null, cells: number) {
   ))
 }
 
+const RESEED_MS = 500
+
+async function seed($: EngineInterface) {
+  await update($, isOpen, () => false)
+  await refresh($)
+  ticker?.cancel()
+  ticker = await $.clock.every(TICK_MS, () => tick($))
+}
+
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
-    await update($, isOpen, () => false)
-    await refresh($)
-    ticker?.cancel()
-    ticker = await $.clock.every(TICK_MS, () => tick($))
+    await seed($)
     await $.command
       .register({ name: 'session-stats', description: 'Show model, effort and usage in a pane' })
       .catch(() => undefined)
+
+    return next(e)
+  })
+
+  // /clear resets this plugin's state after session.end and fires no session.start, so setup reruns from a timer.
+  on('session.end', async ($, e, next) => {
+    if (e.reason === 'clear') {
+      $.clock.after(RESEED_MS, () => {
+        void seed($)
+      })
+    }
 
     return next(e)
   })
