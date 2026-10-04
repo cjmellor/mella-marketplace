@@ -26,6 +26,18 @@ Automatic, always-on cross-session memory. grain quietly records what you did an
 
 It runs entirely through three lifecycle hooks (SessionStart recalls, PreCompact checkpoints, SessionEnd finalises). Capture is pattern-based and local — **no model calls, no API keys, no cost, no network.** Memory lives as plain Markdown under `~/.claude/grain/`, keyed per project. See [`plugins/grain/README.md`](plugins/grain/README.md) for controls and details.
 
+### Mods
+
+Mods are plugins that put live UI inside Claude Code: a band above the prompt, a pane you can open, and slash commands to drive them. They need a Claude Code build that loads plugin modules, and they run code on your machine — each one is a single `hooks/register.tsx` file, so read it before you install.
+
+| Mod | What it does | Open it with |
+|-----|--------------|--------------|
+| `git-diff` | Keeps uncommitted changes in view: a band above the prompt shows files changed, lines added and removed and the current branch, and a pane lists every changed file as a flat list or a folder tree. | `/git-diff`, or the `+` button on the band |
+| `usage` | Shows the model, reasoning effort, context fill and rate-limit usage above the prompt, so you can drop a `statusline` script for them. The pane breaks the context window down. | `/session-stats`, or the `+` button on the band |
+| `artisan-dev` | Runs a Laravel app's `php artisan dev` from inside the session: per-process logs, restart and stop controls, a port override, site and tunnel links, and server state you can attach to your next prompt. | `/dev` |
+
+See each mod's README for details: [`git-diff`](plugins/git-diff/README.md), [`usage`](plugins/usage/README.md), [`artisan-dev`](plugins/artisan-dev/README.md).
+
 ## Installation
 
 **1. Add the marketplace:**
@@ -45,6 +57,11 @@ It runs entirely through three lifecycle hooks (SessionStart recalls, PreCompact
 
 # Or the always-on cross-session memory plugin
 /plugin install grain@mella-marketplace
+
+# Or any of the mods
+/plugin install git-diff@mella-marketplace
+/plugin install usage@mella-marketplace
+/plugin install artisan-dev@mella-marketplace
 ```
 
 **3. Start using:**
@@ -70,6 +87,9 @@ It runs entirely through three lifecycle hooks (SessionStart recalls, PreCompact
 
 # Generate 10 ideas with a brief — no setup questions
 /mella:pitch 10 Laravel gamification package, add a leaderboard
+
+# Start a Laravel app's dev processes and open their pane
+/dev
 ```
 
 ## Uninstall
