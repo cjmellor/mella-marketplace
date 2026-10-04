@@ -818,10 +818,9 @@ async function emit($: EngineInterface, input: DevEvent | DevEvent[]) {
 }
 
 async function refreshRepo($: EngineInterface) {
-  const cwd = project.dir
-  const top = await $.process.run(['git', 'rev-parse', '--path-format=absolute', '--show-toplevel', '--git-dir', '--git-common-dir'], { cwd })
-  const named = top.exitCode === 0 ? await $.process.run(['git', 'branch', '--show-current'], { cwd }) : null
-  const detached = named && !named.stdout.trim() ? await $.process.run(['git', 'rev-parse', '--short', 'HEAD'], { cwd }) : null
+  const top = await $.process.run(['git', 'rev-parse', '--path-format=absolute', '--show-toplevel', '--git-dir', '--git-common-dir'])
+  const named = top.exitCode === 0 ? await $.process.run(['git', 'branch', '--show-current']) : null
+  const detached = named && !named.stdout.trim() ? await $.process.run(['git', 'rev-parse', '--short', 'HEAD']) : null
   const next = named ? parseRepo(top.stdout, named.stdout, detached?.stdout ?? '') : null
   const last = await read($, repo)
 
