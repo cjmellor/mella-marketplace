@@ -28,7 +28,7 @@ It runs entirely through three lifecycle hooks (SessionStart recalls, PreCompact
 
 ### Mods
 
-Mods are plugins that put live UI inside Claude Code: a band above the prompt, a pane you can open, and slash commands to drive them. They need a Claude Code build that loads plugin modules, and they run code on your machine — each one is a single `hooks/register.tsx` file, so read it before you install.
+Mods are plugins that put live UI inside Claude Code: a band above the prompt, a pane you can open, and slash commands to drive them. They need a Claude Code build that loads plugin modules, and they run code on your machine — each one's code is in its `hooks/` folder, so read it before you install.
 
 | Mod | What it does | Open it with |
 |-----|--------------|--------------|

@@ -43,3 +43,16 @@ If the exit kept the worktree, the mod then removes the folder and its branch wh
 - A session that ends without exiting the worktree leaves it marked active, so it is kept.
 - Herd's `links` output is assumed to match Valet's table. It has not been tried.
 - The whole flow was tested against a faked machine. It has not run against a real Herd.
+
+## Development
+
+The pure helpers (link names, `.env` edits, the `links` table, lockfile and asset checks) are in `hooks/lib.ts`, and the enter and exit flows in `hooks/register.ts`. Both are covered by tests that fake the file system, `git`, `composer`, the package manager and Valet:
+
+```bash
+claude plugin validate plugins/worktree-ready
+claude plugin test plugins/worktree-ready
+```
+
+## License
+
+MIT
