@@ -782,6 +782,7 @@ const runners = new Map<string, Runner>()
 const lastToast: Record<string, number> = {}
 let extraHosts: string[] = []
 let project = { dir: '', name: '' }
+let siteDir = ''
 let tick: { cancel: () => void } | null = null
 let watching = false
 let view = { columns: 80, labelWidth: 6 }
@@ -884,6 +885,9 @@ async function refreshRepo($: EngineInterface) {
   const detached = named && !named.stdout.trim() ? await $.process.run(['git', 'rev-parse', '--short', 'HEAD']) : null
   const next = named ? parseRepo(top.stdout, named.stdout, detached?.stdout ?? '') : null
   const last = await read($, repo)
+  siteDir = top.stdout.split('\n')[0]?.trim() ?? ''
+
+  await loadAppUrl($)
 
   if (last?.branch !== next?.branch || last?.worktree !== next?.worktree) {
     await update($, repo, () => next)
@@ -948,10 +952,15 @@ async function readPorts($: EngineInterface) {
   }
 }
 
+async function loadAppUrl($: EngineInterface) {
+  const text = await $.fs.read(`${siteDir || project.dir}/.env`).catch(() => '')
+  await update($, appUrl, () => parseEnvValue(String(text), 'APP_URL') || null)
+}
+
 async function loadConfigured($: EngineInterface) {
   const text = await $.fs.read(`${project.dir}/.env`).catch(() => '')
   await update($, configured, () => parseEnvPort(String(text)))
-  await update($, appUrl, () => parseEnvValue(String(text), 'APP_URL') || null)
+  await loadAppUrl($)
 }
 
 async function processEnv($: EngineInterface): Promise<Record<string, string>> {
