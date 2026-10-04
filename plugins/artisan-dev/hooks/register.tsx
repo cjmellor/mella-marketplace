@@ -1,7 +1,7 @@
 import type { EngineInterface, Register, RenderChildren } from 'claude-code'
 import { atom, read, update } from 'claude-code'
 
-import type { Dev, DevEvent, Entry, Proc, Repo } from '../types'
+import type { Dev, DevEvent, Entry, Layout, Proc, Repo } from '../types'
 
 const DEFAULT_PORT = 8000
 const PANE = 'dev'
@@ -28,6 +28,8 @@ const BADGES: Record<string, string> = {
 const BADGE_PATTERN = /^\s*(INFO|NOTICE|WARN|WARNING|ERROR|FAIL|DEBUG|INF|WRN|ERR|DBG)\b\s*(.*)$/
 const TIMESTAMP_PATTERN = /^\d{4}-\d\d-\d\dT[\d:.]+Z?\s+/
 const TICK_MS = 5000
+const WHERE_OVERHEAD = 5
+const BAND_RESERVE = 6
 const TOAST_GAP_MS = 15_000
 const TERM_GRACE_MS = 2000
 const RESTART_DELAY_MS = 1000
@@ -54,6 +56,7 @@ const onlyErrors = atom({ plugin: 'artisan-dev', key: 'onlyErrors' } as const, f
 const tunnel = atom({ plugin: 'artisan-dev', key: 'tunnel' } as const, null)
 const attached = atom({ plugin: 'artisan-dev', key: 'attached' } as const, null)
 const repo = atom({ plugin: 'artisan-dev', key: 'repo' } as const, null)
+const layout = atom({ plugin: 'artisan-dev', key: 'layout' } as const, null)
 
 const WHEEL_STEP = 3
 
@@ -221,6 +224,48 @@ export const parseRepo = (revParse: string, branch: string, head: string): Repo 
     branch: branch.trim() || head.trim() || null,
     worktree: gitDir === commonDir ? null : (toplevel.split('/').filter(Boolean).pop() ?? null),
   }
+}
+
+export const fitWhere = (where: Repo | null, room: number): string => {
+  const items = [
+    ['⎇', where?.branch],
+    ['⌂', where?.worktree],
+  ].filter((item): item is [string, string] => Boolean(item[1]))
+  let left = room - items.length * WHERE_OVERHEAD
+  let remaining = items.length
+  const shown = new Map<string, string>()
+
+  for (const [icon, name] of [...items].sort((a, b) => a[1].length - b[1].length)) {
+    const cap = Math.max(1, Math.floor(left / remaining))
+    const text = name.length > cap ? `${name.slice(0, Math.max(0, cap - 1))}…` : name
+
+    shown.set(icon, text)
+    left -= text.length
+    remaining -= 1
+  }
+
+  return items.map(([icon]) => ` · ${icon} ${shown.get(icon)}`).join('')
+}
+
+export const parseLayout = (branch: string, head: string, porcelain: string): Layout => ({
+  branch: branch.trim() || head.trim(),
+  worktrees: porcelain
+    .split('\n')
+    .filter(line => line.startsWith('worktree '))
+    .map(line => line.slice('worktree '.length))
+    .sort(),
+})
+
+export const layoutChange = (last: Layout | null, next: Layout): string | null => {
+  if (!last) {
+    return null
+  }
+
+  if (last.branch !== next.branch) {
+    return `Branch changed to ${next.branch}`
+  }
+
+  return last.worktrees.join('\n') === next.worktrees.join('\n') ? null : 'Worktrees changed'
 }
 
 export const matchProcess = (procs: { label: string }[], target: string): string | null => {
@@ -829,9 +874,30 @@ async function refreshRepo($: EngineInterface) {
   }
 }
 
+async function watchLayout($: EngineInterface) {
+  const cwd = project.dir
+  const named = await $.process.run(['git', 'branch', '--show-current'], { cwd })
+  const detached = named.exitCode === 0 && !named.stdout.trim() ? await $.process.run(['git', 'rev-parse', '--short', 'HEAD'], { cwd }) : null
+  const listed = await $.process.run(['git', 'worktree', 'list', '--porcelain'], { cwd })
+
+  if (named.exitCode !== 0 || listed.exitCode !== 0) {
+    return
+  }
+
+  const next = parseLayout(named.stdout, detached?.stdout ?? '', listed.stdout)
+  const reason = layoutChange(await read($, layout), next)
+  await update($, layout, () => next)
+
+  if (reason && (await read($, dev)).status === 'running') {
+    $.ui.toast(`${reason} — restarting the dev servers`, { timeoutMs: 6000 })
+    await restartAll($)
+  }
+}
+
 function ensureTick($: EngineInterface) {
   tick ??= $.clock.every(TICK_MS, async () => {
-    await refreshRepo($)
+    await refreshRepo($).catch(() => undefined)
+    await watchLayout($).catch(() => undefined)
 
     if (anyActive()) {
       const at = await $.clock.now()
@@ -1289,6 +1355,7 @@ async function carryState($: EngineInterface) {
     tunnel: await read($, tunnel),
     onlyErrors: await read($, onlyErrors),
     repo: await read($, repo),
+    layout: await read($, layout),
   }
 }
 
@@ -1302,6 +1369,7 @@ async function restoreState($: EngineInterface, carried: Awaited<ReturnType<type
   await update($, tunnel, () => carried.tunnel)
   await update($, onlyErrors, () => carried.onlyErrors)
   await update($, repo, () => carried.repo)
+  await update($, layout, () => carried.layout)
   await update($, isOpen, () => false)
   $.ui.status(undefined)
 }
@@ -1619,7 +1687,7 @@ export const register: Register = (on, options) => {
   extraHosts = parseHosts(String(options.tunnelHosts ?? ''))
 
   on('session.start', async ($, e, next) => {
-    const dir = String(options.projectDir ?? '').trim() || (await $.session.cwd())
+    const dir = String(options.projectDir ?? '').trim() || (await $.session.repo().catch(() => null))?.root || (await $.session.cwd())
 
     project = { dir, name: dir.split('/').filter(Boolean).pop() ?? dir }
     await $.command.register({
@@ -1633,7 +1701,8 @@ export const register: Register = (on, options) => {
     tick?.cancel()
     tick = null
     await dropAttached($)
-    await refreshRepo($)
+    await refreshRepo($).catch(() => undefined)
+    await watchLayout($).catch(() => undefined)
     ensureTick($)
 
     return next(e)
@@ -1707,6 +1776,10 @@ export const register: Register = (on, options) => {
     const base = await read($, appUrl)
     const where = await read($, repo)
     const detail = current.status === 'stopped' ? ' stopped' : ` · ${up}/${total} up`
+    const site = current.status === 'stopped' ? 0 : 1 + (port ? `:${port} ↗` : '↗ site').length
+    const errorText = errors > 0 ? ` · ${errors} err` : ''
+    const used = ' dev'.length + 1 + site + detail.length + errorText.length + BAND_RESERVE
+    const whereText = fitWhere(where, e.props.bodyColumns - used)
 
     return stack(
       <Box>
@@ -1724,9 +1797,8 @@ export const register: Register = (on, options) => {
           </Box>
         )}
         <Text dimColor>{detail}</Text>
-        {errors > 0 ? <Text color="red">{` · ${errors} err`}</Text> : null}
-        {where?.branch ? <Text dimColor>{` · ⎇ ${where.branch}`}</Text> : null}
-        {where?.worktree ? <Text dimColor>{` · ⌂ ${where.worktree}`}</Text> : null}
+        {errors > 0 ? <Text color="red">{errorText}</Text> : null}
+        {whereText ? <Text dimColor>{whereText}</Text> : null}
         <Text>  </Text>
         <Button key="dev-toggle" label={open ? '−' : '+'} plain dimColor onPress={() => togglePane($)} />
       </Box>,

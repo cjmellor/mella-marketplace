@@ -38,6 +38,8 @@ export type DevEvent = {
 
 export type Repo = { branch: string | null; worktree: string | null }
 
+export type Layout = { branch: string; worktrees: string[] }
+
 declare module 'claude-code' {
   interface PluginState {
     'artisan-dev': {
@@ -54,6 +56,7 @@ declare module 'claude-code' {
       tunnel: { label: string; url: string } | null
       attached: { label: string | null; text: string } | null
       repo: Repo | null
+      layout: Layout | null
     }
   }
 }

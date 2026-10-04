@@ -48,6 +48,8 @@ The site opens at `APP_URL` from `.env`. A loopback `APP_URL` (`localhost` or `1
 
 ### Crashes and restarts
 
+While the servers run, the mod checks the project's main checkout every few seconds. If its branch changes, or a git worktree is added or removed, it restarts everything and shows a toast naming the cause. The servers always run from the main checkout, even when the session itself has moved into a worktree.
+
 Each process runs in its own process group, so stopping or restarting one kills everything it started. A process that exits with a non-zero code or is killed from outside is restarted up to five times; a process that dies within a second of starting is not retried. The budget resets after a minute of healthy running or when you press Start all. Toasts report starts, crashes, restarts and giving up.
 
 Reloading the mod or ending the session stops the servers. Anything left over from an earlier load is cleaned up when the session starts, but only if its process group still carries this mod's marker.

@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import type { Dev } from '../types'
-import { parseRepo, applyEvent, colorFor, applySgr, buttonGrid, buttonText, clearedLog, color256, afterCarriage, findTunnelUrl, layoutEntry, isProblem, logText, matchProcess, parseHosts, statusText, visibleEntries, effectivePort, gridRows, hasAnsi, logRoom, nextBack, judgeExit, noProcess, parseAnsi, wrapRanges, wrapSegments, parseDevArgs, statusColor, parseDevList, parseEnvPort, parseEnvValue, siteUrl, promptText, rule, spawnArgv, toPort, PGID_MARK, splitLines, stripAnsi, summarise, uptime, wrapText } from './register'
+import { fitWhere, layoutChange, parseLayout, parseRepo, applyEvent, colorFor, applySgr, buttonGrid, buttonText, clearedLog, color256, afterCarriage, findTunnelUrl, layoutEntry, isProblem, logText, matchProcess, parseHosts, statusText, visibleEntries, effectivePort, gridRows, hasAnsi, logRoom, nextBack, judgeExit, noProcess, parseAnsi, wrapRanges, wrapSegments, parseDevArgs, statusColor, parseDevList, parseEnvPort, parseEnvValue, siteUrl, promptText, rule, spawnArgv, toPort, PGID_MARK, splitLines, stripAnsi, summarise, uptime, wrapText } from './register'
 
 const empty: Dev = { status: 'running', procs: [], feed: [], notes: [] }
 const started = applyEvent(empty, { type: 'start', label: 'server', command: 'php artisan serve', pid: 10, time: '2026-10-03T16:00:00.000Z' })
@@ -450,4 +450,25 @@ test('parses the branch and names a linked worktree', () => {
   expect(parseRepo('/a/kandu/.claude/worktrees/fix\n/a/kandu/.git/worktrees/fix\n/a/kandu/.git', 'fix-x\n', '')).toEqual({ branch: 'fix-x', worktree: 'fix' })
   expect(parseRepo('/a/kandu\n/a/kandu/.git\n/a/kandu/.git', '', 'abc123\n')).toEqual({ branch: 'abc123', worktree: null })
   expect(parseRepo('', '', '')).toBeNull()
+})
+
+test('fits the branch and worktree into the room the band has left', () => {
+  const both = { branch: 'worktree-purring-crafting', worktree: 'purring-crafting' }
+
+  expect(fitWhere(both, 80)).toBe(' · ⎇ worktree-purring-crafting · ⌂ purring-crafting')
+  expect(fitWhere(both, 30)).toBe(' · ⎇ worktree-… · ⌂ purring-c…')
+  expect(fitWhere({ branch: 'main', worktree: null }, 30)).toBe(' · ⎇ main')
+  expect(fitWhere(null, 30)).toBe('')
+})
+
+test('a branch switch or a worktree appearing counts as a change, the first read does not', () => {
+  const porcelain = 'worktree /a/kandu\nHEAD abc\nbranch refs/heads/main\n'
+  const main = parseLayout('main\n', '', porcelain)
+  const added = parseLayout('main\n', '', `${porcelain}\nworktree /a/kandu/.claude/worktrees/x\nHEAD abc\n`)
+
+  expect(main).toEqual({ branch: 'main', worktrees: ['/a/kandu'] })
+  expect(layoutChange(null, main)).toBeNull()
+  expect(layoutChange(main, main)).toBeNull()
+  expect(layoutChange(main, parseLayout('', 'abc123\n', porcelain))).toBe('Branch changed to abc123')
+  expect(layoutChange(main, added)).toBe('Worktrees changed')
 })
