@@ -1,6 +1,6 @@
 import type { EngineInterface, Register } from 'claude-code'
 
-import { ASSET_INPUTS, CLONES, JS_LOCK_FILES, TOOLS, basename, chooseTool, jsPlan, linkName, parseLinks, parseWorktree, setEnv, shareSqlite, underWorktrees } from './lib'
+import { ASSET_INPUTS, CLONES, JS_LOCK_FILES, TOOLS, basename, certBase, chooseTool, jsPlan, linkName, parseLinks, parseWorktree, setEnv, shareSqlite, underWorktrees } from './lib'
 import type { Link, Tool, WorktreeInfo, WorktreeRecord } from './lib'
 
 const PLUGIN = 'worktree-ready'
@@ -123,6 +123,17 @@ async function shareDatabase($: EngineInterface, { main, top }: WorktreeInfo) {
 
 const setAppUrl = ($: EngineInterface, top: string, url: string) => editEnv($, top, text => setEnv(text, 'APP_URL', url))
 
+async function useSiteCert($: EngineInterface, top: string, tool: Tool, url: string) {
+  const home = (await run($, ['printenv', 'HOME'])).stdout.trim()
+  const base = certBase(tool, home, new URL(url).hostname)
+
+  if (!home || !(await $.fs.exists(`${base}.key`)) || !(await $.fs.exists(`${base}.crt`))) {
+    return
+  }
+
+  await editEnv($, top, text => setEnv(setEnv(text, 'VITE_DEV_SERVER_KEY', `${base}.key`), 'VITE_DEV_SERVER_CERT', `${base}.crt`))
+}
+
 async function lockDiffers($: EngineInterface, { main, top }: WorktreeInfo, file: string): Promise<boolean> {
   return !passed(await run($, ['cmp', '-s', `${main}/${file}`, `${top}/${file}`]))
 }
@@ -233,6 +244,10 @@ async function setUp($: EngineInterface, info: WorktreeInfo): Promise<string | n
 
   if (site.url) {
     await setAppUrl($, top, site.url)
+  }
+
+  if (site.url && tool) {
+    await useSiteCert($, top, tool, site.url)
   }
 
   const branch = (await run($, ['git', 'rev-parse', '--abbrev-ref', 'HEAD'], top)).stdout.trim()

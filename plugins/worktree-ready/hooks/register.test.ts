@@ -77,6 +77,7 @@ const respond = (w: World, argv: string[], cwd: string | undefined) => {
   }
   if (line.startsWith('cmp -s')) return w.sameLocks ? ok() : fail()
   if (line === 'git rev-parse HEAD') return ok(`${w.head}\n`)
+  if (line === 'printenv HOME') return ok('/u\n')
   if (line.startsWith('mkdir ')) return w.locked ? fail() : ok()
   if (line.startsWith('rmdir ')) {
     w.locked = false
@@ -180,6 +181,19 @@ test('entering a worktree whose lockfiles and assets match main clones, installs
   expect(w.texts.get(`${TREE}/.env`)).toBe(`APP_NAME=Kandu\nAPP_URL=https://${NAME}.test\n`)
   expect(w.store.get(`wt:${TREE}`)).toMatchObject({ link: NAME, tool: 'valet', state: 'active', branch: 'worktree-purring-crafting' })
   expect(w.toasts).toContain(`Worktree ready at https://${NAME}.test`)
+})
+
+test('points Vite at the secured site certificate so the dev server runs on https', async ($, on) => {
+  const cert = `/u/.config/valet/Certificates/${NAME}.test`
+  const w = world()
+
+  w.files.add(`${cert}.key`)
+  w.files.add(`${cert}.crt`)
+  stubWorld(on, w)
+  on('tool.call', enter(w))
+  await $.tool.call({ tool: 'EnterWorktree', name: 'purring-crafting' })
+
+  expect(w.texts.get(`${TREE}/.env`)).toBe(`APP_NAME=Kandu\nAPP_URL=https://${NAME}.test\nVITE_DEV_SERVER_KEY=${cert}.key\nVITE_DEV_SERVER_CERT=${cert}.crt\n`)
 })
 
 test('a changed lockfile installs, and changed frontend sources rebuild', async ($, on) => {
