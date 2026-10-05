@@ -283,6 +283,9 @@ export const layoutChange = (last: Layout | null, next: Layout): string | null =
   return last.worktrees.join('\n') === next.worktrees.join('\n') ? null : 'Worktrees changed'
 }
 
+export const pickDir = (dirs: { pinned: string; here: string; ready: boolean; current: string; main: string }): string =>
+  dirs.pinned || (dirs.ready ? dirs.here : dirs.current || dirs.main || dirs.here)
+
 export const matchProcess = (procs: { label: string }[], target: string): string | null => {
   if (/^\d+$/.test(target)) {
     return procs[Number(target) - 1]?.label ?? null
@@ -786,6 +789,8 @@ const runners = new Map<string, Runner>()
 const lastToast: Record<string, number> = {}
 let extraHosts: string[] = []
 let project = { dir: '', name: '' }
+let pinnedDir = ''
+let mainDir = ''
 let siteDir = ''
 let rewatch = false
 let tick: { cancel: () => void } | null = null
@@ -904,6 +909,31 @@ async function refreshRepo($: EngineInterface) {
 
   if (last?.branch !== next?.branch || last?.worktree !== next?.worktree) {
     await update($, repo, () => next)
+  }
+}
+
+async function followCheckout($: EngineInterface): Promise<boolean> {
+  await refreshRepo($).catch(() => undefined)
+
+  const here = siteDir || (await $.session.cwd())
+  const ready = !pinnedDir && (await $.fs.exists(`${here}/vendor/autoload.php`).catch(() => false))
+  const dir = pickDir({ pinned: pinnedDir, here, ready, current: project.dir, main: mainDir })
+
+  if (dir === project.dir) {
+    return false
+  }
+
+  const moved = project.dir !== ''
+  project = { dir, name: dir.split('/').filter(Boolean).pop() ?? dir }
+  await update($, layout, () => null)
+
+  return moved
+}
+
+async function followSession($: EngineInterface) {
+  if ((await followCheckout($)) && (await read($, dev)).status === 'running') {
+    $.ui.toast(`Moved to ${project.name} — restarting the dev servers`, { timeoutMs: 6000 })
+    await restartAll($)
   }
 }
 
@@ -1480,6 +1510,7 @@ async function runDev($: EngineInterface, args: DevArgs): Promise<string> {
     return DEV_HELP
   }
 
+  await (args.action === 'stop' ? followCheckout($) : followSession($))
   await loadConfigured($)
 
   const current = await read($, dev)
@@ -1751,9 +1782,10 @@ export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     const root = (await $.session.repo().catch(() => null))?.root
     const prefix = root ? ((await $.process.run(['git', 'rev-parse', '--show-prefix']).catch(() => null))?.stdout.trim().replace(/\/$/, '') ?? '') : ''
-    const dir = String(options.projectDir ?? '').trim() || (root ? (prefix ? `${root}/${prefix}` : root) : await $.session.cwd())
-
-    project = { dir, name: dir.split('/').filter(Boolean).pop() ?? dir }
+    pinnedDir = String(options.projectDir ?? '').trim()
+    mainDir = root ? (prefix ? `${root}/${prefix}` : root) : ''
+    project = { dir: '', name: '' }
+    await followCheckout($)
     await $.command.register({
       name: 'dev',
       description: `Manage ${project.name} \`php artisan dev\` in a pane`,
@@ -1795,7 +1827,7 @@ export const register: Register = (on, options) => {
     const result = await next(e)
 
     $.clock.after(0, () => {
-      void refreshRepo($)
+      void followSession($)
         .catch(() => undefined)
         .then(() => watchLayout($))
         .catch(() => undefined)

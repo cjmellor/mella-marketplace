@@ -52,7 +52,7 @@ A line counts as an error only when it carries a severity marker where its tool 
 
 ### Crashes and restarts
 
-While the servers run, the mod checks the project's main checkout right after Claude enters or exits a worktree, and every few seconds otherwise. If its branch changes, or a git worktree is added or removed, it restarts everything and shows a toast naming the cause. The servers always run from the main checkout, even when the session itself has moved into a worktree.
+The servers run from the checkout the session is in. When Claude enters or exits a worktree, or you run `/dev`, the mod moves to that checkout and restarts anything running there. It moves only once the checkout has `vendor/autoload.php`, so a worktree that isn't provisioned yet keeps the servers where they were. While the servers run, the mod also checks that checkout every few seconds. If its branch changes, or a git worktree is added or removed, it restarts everything and shows a toast naming the cause.
 
 Each process runs in its own process group, so stopping or restarting one kills everything it started. A process that exits with a non-zero code or is killed from outside is restarted up to five times; a process that dies within a second of starting is not retried. The budget resets after a minute of healthy running or when you press Start all. Toasts report starts, crashes, restarts and giving up.
 
@@ -66,7 +66,7 @@ When a process prints a public tunnel URL (Cloudflare, ngrok, Expose and Herd sh
 
 | Setting | Default | Purpose |
 |---------|---------|---------|
-| `projectDir` | empty | Absolute path of the Laravel app. Empty uses the session's folder; when the session starts inside a worktree, the same folder in the main checkout. |
+| `projectDir` | empty | Absolute path of the Laravel app, which the servers then never leave. Empty follows the session's checkout, worktrees included, falling back to the same folder in the main checkout until a worktree is provisioned. |
 | `tunnelHosts` | empty | Extra comma-separated domains to treat as a tunnel, for providers not built in. |
 
 ## Development
