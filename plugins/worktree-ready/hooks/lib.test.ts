@@ -1,6 +1,11 @@
 import { expect, test } from 'claude-code/testing'
 
-import { chooseTool, jsPlan, linkName, parseLinks, parseWorktree, setEnv, shareSqlite, underWorktrees } from './lib'
+import { certBase, chooseTool, jsPlan, linkName, parseLinks, parseWorktree, setEnv, shareSqlite, underWorktrees } from './lib'
+
+test('finds the site certificate where Valet or Herd keeps it', () => {
+  expect(certBase('valet', '/u', 'kandu-wt.test')).toBe('/u/.config/valet/Certificates/kandu-wt.test')
+  expect(certBase('herd', '/u', 'kandu-wt.test')).toBe('/u/Library/Application Support/Herd/config/valet/Certificates/kandu-wt.test')
+})
 
 const LINKS = [
   '+--------------------------+-----+---------------------------------------+-------------------------------------------+-------------+',
