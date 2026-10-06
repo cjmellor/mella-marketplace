@@ -1,6 +1,6 @@
 {
   "name": "worktree-ready",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Makes a new git worktree of a Laravel app ready to use with no hands: clones vendor, node_modules and built assets with copy-on-write, links it with Valet or Herd over HTTPS, and cleans it up when you leave.",
   "author": { "name": "Chris Mellor" },
   "keywords": ["laravel", "worktree", "valet", "herd", "mod", "copy-on-write"],

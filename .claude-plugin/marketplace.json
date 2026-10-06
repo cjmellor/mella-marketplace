@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "Mella's curated marketplace of Claude Code plugins",
-    "version": "1.20.0"
+    "version": "1.20.1"
   },
   "plugins": [
     {
@@ -45,7 +45,7 @@
       "name": "artisan-dev",
       "source": "./plugins/artisan-dev",
       "description": "Runs `php artisan dev` for a Laravel project and manages it from a pane: per-process logs, restart and stop controls, port override, site and tunnel links.",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "keywords": ["laravel", "dev-server", "pane", "mod", "artisan"],
       "license": "MIT"
     },
@@ -53,7 +53,7 @@
       "name": "worktree-ready",
       "source": "./plugins/worktree-ready",
       "description": "Makes a new git worktree of a Laravel app ready with no hands: copy-on-write clones of vendor, node_modules and built assets, a Valet or Herd HTTPS site, and clean-up when you leave.",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "keywords": ["laravel", "worktree", "valet", "herd", "mod", "copy-on-write"],
       "license": "MIT"
     }
