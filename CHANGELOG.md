@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.1] - 2026-10-06
+
+### Fixed
+
+- **`artisan-dev` runs the dev servers from the session's worktree** (artisan-dev → v0.3.1). `/dev` used to start them in the main checkout while the band linked the worktree's site. They now follow the session's checkout once it has `vendor/autoload.php`, moving when `/dev` runs or Claude enters or exits a worktree and restarting anything running. `projectDir` still pins one folder.
+- **`worktree-ready` serves the worktree's Vite dev server over https** (worktree-ready → v0.1.1). It points `VITE_DEV_SERVER_KEY` and `VITE_DEV_SERVER_CERT` in the worktree's `.env` at the site's certificate, so the worktree's https site loads its JS and CSS.
+
 ## [1.20.0] - 2026-10-06
 
 ### Added
