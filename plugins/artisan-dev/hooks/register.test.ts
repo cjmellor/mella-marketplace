@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import type { Dev } from '../types'
-import { hasError, layoutChange, parseLayout, applyEvent, colorFor, applySgr, buttonGrid, buttonText, clearedLog, color256, afterCarriage, findTunnelUrl, layoutEntry, isProblem, logText, matchProcess, parseHosts, statusText, visibleEntries, effectivePort, gridRows, hasAnsi, logRoom, nextBack, judgeExit, noProcess, parseAnsi, wrapRanges, wrapSegments, parseDevArgs, statusColor, parseDevList, parseEnvPort, parseEnvValue, siteUrl, siteHost, promptText, rule, spawnArgv, toPort, PGID_MARK, splitLines, stripAnsi, summarise, uptime, wrapText } from './register'
+import { hasError, layoutChange, parseLayout, pickDir, applyEvent, colorFor, applySgr, buttonGrid, buttonText, clearedLog, color256, afterCarriage, findTunnelUrl, layoutEntry, isProblem, logText, matchProcess, parseHosts, statusText, visibleEntries, effectivePort, gridRows, hasAnsi, logRoom, nextBack, judgeExit, noProcess, parseAnsi, wrapRanges, wrapSegments, parseDevArgs, statusColor, parseDevList, parseEnvPort, parseEnvValue, siteUrl, siteHost, promptText, rule, spawnArgv, toPort, PGID_MARK, splitLines, stripAnsi, summarise, uptime, wrapText } from './register'
 
 const empty: Dev = { status: 'running', procs: [], feed: [], notes: [] }
 const started = applyEvent(empty, { type: 'start', label: 'server', command: 'php artisan serve', pid: 10, time: '2026-10-03T16:00:00.000Z' })
@@ -484,4 +484,14 @@ test('only a severity marker where the tool puts one counts as an error', () => 
   expect(hasError('Error handling is configured for the failed jobs table')).toBe(false)
   expect(hasError('[2026-10-04 14:21:39] local.DEBUG: [vite] connected. {"url":"https://kandu.test/login"}')).toBe(false)
   expect(hasError('it_handles_failed_jobs ✓')).toBe(false)
+})
+
+test('runs from the session checkout once it is provisioned, else stays put', () => {
+  const dirs = { pinned: '', here: '/app/.claude/worktrees/wt', ready: true, current: '/app', main: '/app' }
+
+  expect(pickDir(dirs)).toBe('/app/.claude/worktrees/wt')
+  expect(pickDir({ ...dirs, ready: false })).toBe('/app')
+  expect(pickDir({ ...dirs, ready: false, current: '' })).toBe('/app')
+  expect(pickDir({ ...dirs, ready: false, current: '', main: '' })).toBe('/app/.claude/worktrees/wt')
+  expect(pickDir({ ...dirs, pinned: '/elsewhere' })).toBe('/elsewhere')
 })

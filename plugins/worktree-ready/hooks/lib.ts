@@ -112,6 +112,9 @@ export const jsPlan = (files: string[], hasBuild: boolean): JsPlan => {
   return { lock: found[0], install: found[1], build: hasBuild ? found[2] : null }
 }
 
+export const certBase = (tool: Tool, home: string, host: string): string =>
+  tool === 'herd' ? `${home}/Library/Application Support/Herd/config/valet/Certificates/${host}` : `${home}/.config/valet/Certificates/${host}`
+
 export const setEnv = (text: string, key: string, value: string): string => {
   const line = `${key}=${/\s/.test(value) ? `"${value}"` : value}`
   const pattern = new RegExp(`^${key}=.*$`, 'm')
