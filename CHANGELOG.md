@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.0] - 2026-10-06
+
+### Added
+
+- **Worktree or branch in the `session-stats` band** (session-stats → v0.3.0). The band ends with `⎇` and the worktree's name when the session is in one, or the git branch otherwise, shortened to fit the terminal. It shows whether or not a dev server runs, follows Claude into and out of worktrees straight away, and is read again after each turn. session-stats now runs read-only `git` commands for this.
+
+### Changed
+
+- **`artisan-dev` drops the branch and worktree from its band** (artisan-dev → v0.3.0); `session-stats` shows them instead. The site link is labelled with the `APP_URL` host again inside a worktree. The servers still restart on branch and worktree changes.
+
 ## [1.19.0] - 2026-10-04
 
 ### Added
