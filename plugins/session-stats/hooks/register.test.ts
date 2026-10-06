@@ -1,4 +1,4 @@
-import type { On } from 'claude-code'
+import type { CommandPresentation, On, PromptOrigin } from 'claude-code'
 import { expect, test } from 'claude-code/testing'
 
 import type { Snapshot } from '../types'
@@ -23,6 +23,10 @@ import {
 } from './register'
 
 const empty = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, turnMs: 0, byModel: {} }
+const fromComposer: { origin: PromptOrigin; presentation: CommandPresentation } = {
+  origin: { kind: 'composer' },
+  presentation: { isFullscreen: false, columns: 80 },
+}
 
 test('turns add into session totals, cache hit and model shares', () => {
   const first = addTurn(
@@ -93,7 +97,7 @@ test('a model switch updates the shown model without waiting for a turn', async 
   })
   const written = stubState(on)
 
-  await $.command.run({ command: 'model', args: 'sonnet' })
+  await $.command.run({ command: 'model', args: 'sonnet', ...fromComposer })
 
   expect((written.snapshot as Snapshot | undefined)?.model).toBe('claude-sonnet-5-5')
   expect(written.effort).toBeNull()
@@ -103,7 +107,7 @@ test('/effort with a level updates the icon without waiting for a turn', async (
   on('command.run', () => ({ text: '' }))
   const written = stubState(on)
 
-  await $.command.run({ command: 'effort', args: 'low' })
+  await $.command.run({ command: 'effort', args: 'low', ...fromComposer })
 
   expect(written.effort).toBe('low')
 })
