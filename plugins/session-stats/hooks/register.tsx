@@ -1,7 +1,7 @@
 import type { EngineInterface, Register, SessionUsage, TurnUsage } from 'claude-code'
 import { atom, read, update } from 'claude-code'
 
-import type { Category, Snapshot, Totals } from '../types'
+import type { Category, Location, Snapshot, Totals } from '../types'
 
 const emptyTotals: Totals = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, turnMs: 0, byModel: {} }
 
@@ -11,6 +11,7 @@ const isOpen = atom({ plugin: 'session-stats', key: 'isOpen' } as const, false)
 const now = atom({ plugin: 'session-stats', key: 'now' } as const, 0)
 const totals = atom({ plugin: 'session-stats', key: 'totals' } as const, emptyTotals)
 const effort = atom({ plugin: 'session-stats', key: 'effort' } as const, null)
+const location = atom({ plugin: 'session-stats', key: 'location' } as const, null)
 
 const EFFORT_LEVELS = ['low', 'medium', 'high', 'xhigh', 'max'] as const
 const EFFORT_ICONS: Record<(typeof EFFORT_LEVELS)[number], string> = { low: '○', medium: '◐', high: '●', xhigh: '◉', max: '◈' }
@@ -29,6 +30,8 @@ const PANE_BAR_CELLS = 20
 const PANE = 'usage'
 const MAX_PANE_ROWS = 30
 const TICK_MS = 60_000
+const LOCATION_OVERHEAD = 4
+const BAND_RESERVE = 2
 
 type Level = 'green' | 'yellow' | 'red'
 
@@ -141,6 +144,73 @@ export const toSnapshot = (model: string, usage: SessionUsage): Snapshot => ({
   usd: usage.cost?.usd ?? null,
 })
 
+export const parseLocation = (revParse: string, branch: string, head: string): Location | null => {
+  const [toplevel, gitDir, commonDir] = revParse.split('\n').map(line => line.trim())
+
+  if (!toplevel || !gitDir || !commonDir) {
+    return null
+  }
+
+  return {
+    branch: branch.trim() || head.trim() || null,
+    worktree: gitDir === commonDir ? null : (toplevel.split('/').filter(Boolean).pop() ?? null),
+  }
+}
+
+export const fitLocation = (where: Location | null, room: number): { branch: string; worktree: string } => {
+  const names = [where?.branch ?? '', where?.worktree ?? '']
+  const order = names.flatMap((name, slot) => (name ? [{ name, slot }] : [])).sort((a, b) => a.name.length - b.name.length)
+  const shown = ['', '']
+  let left = room - order.length * LOCATION_OVERHEAD
+
+  if (left < order.length) {
+    return { branch: '', worktree: '' }
+  }
+
+  order.forEach(({ name, slot }, done) => {
+    const cap = Math.floor(left / (order.length - done))
+    const text = name.length > cap ? `${name.slice(0, cap - 1)}…` : name
+
+    shown[slot] = text
+    left -= text.length
+  })
+
+  return { branch: shown[0] ?? '', worktree: shown[1] ?? '' }
+}
+
+export const bandColumns = (current: Snapshot, icon: string, at: number): number => {
+  const percent = current.percent === null ? '–' : `${current.percent}%`
+  const limits = current.limits.reduce((sum, limit) => {
+    const left = countdown(limit.resetsAt, at)
+
+    return sum + 2 + limitLabel(limit.kind).length + 1 + `${Math.round(limit.percentUsed)}%`.length + (left ? left.length + 3 : 0)
+  }, 0)
+
+  return prettyModel(current.model).length + (icon ? icon.length + 1 : 0) + 2 + BAR_CELLS + 1 + percent.length + limits + 3
+}
+
+async function readLocation($: EngineInterface): Promise<Location | null> {
+  const top = await $.process.run(['git', 'rev-parse', '--path-format=absolute', '--show-toplevel', '--git-dir', '--git-common-dir'])
+
+  if (top.exitCode !== 0) {
+    return null
+  }
+
+  const named = await $.process.run(['git', 'branch', '--show-current'])
+  const detached = named.exitCode === 0 && !named.stdout.trim() ? await $.process.run(['git', 'rev-parse', '--short', 'HEAD']) : null
+
+  return parseLocation(top.stdout, named.exitCode === 0 ? named.stdout : '', detached?.stdout ?? '')
+}
+
+async function refreshLocation($: EngineInterface) {
+  const next = await readLocation($).catch(() => null)
+  const last = await read($, location)
+
+  if (last?.branch !== next?.branch || last?.worktree !== next?.worktree) {
+    await update($, location, () => next)
+  }
+}
+
 async function refresh($: EngineInterface) {
   const usage = await $.session.usage()
   const model = await $.session.model()
@@ -196,6 +266,7 @@ const RESEED_MS = 500
 async function seed($: EngineInterface) {
   await update($, isOpen, () => false)
   await refresh($)
+  await refreshLocation($)
   ticker?.cancel()
   ticker = await $.clock.every(TICK_MS, () => tick($))
 }
@@ -281,8 +352,19 @@ export const register: Register = on => {
     }
 
     await refresh($)
+    await refreshLocation($)
 
     return next(e)
+  })
+
+  on('tool.call', { tool: ['EnterWorktree', 'ExitWorktree'] }, async ($, e, next) => {
+    const result = await next(e)
+
+    $.clock.after(0, () => {
+      void refreshLocation($).catch(() => undefined)
+    })
+
+    return result
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
@@ -297,6 +379,7 @@ export const register: Register = on => {
     const at = await read($, now)
     const paneIsOpen = await read($, isOpen)
     const icon = effortIcon(await read($, effort))
+    const shown = fitLocation(await read($, location), e.props.bodyColumns - bandColumns(current, icon, at) - BAND_RESERVE)
 
     const band = (
       <Box>
@@ -318,6 +401,8 @@ export const register: Register = on => {
             </Box>
           )
         })}
+        {shown.branch ? <Text dimColor>{`  ⎇ ${shown.branch}`}</Text> : null}
+        {shown.worktree ? <Text dimColor>{` @ ${shown.worktree}`}</Text> : null}
         <Text>  </Text>
         <Button key="toggle" label={paneIsOpen ? '−' : '+'} plain dimColor onPress={() => togglePane($)} />
       </Box>

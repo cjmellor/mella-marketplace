@@ -5,14 +5,15 @@ view, so you can drop a `statusline` script for them.
 
 > Mods run code inside Claude Code on your machine. Read the source before you
 > install one — this one is a single file, `hooks/register.tsx`, and only reads
-> the session's own figures. It runs no shell commands and makes no network calls.
+> the session's own figures. Its only shell commands are read-only `git` calls for
+> the branch and worktree, and it makes no network calls.
 
 ## The band
 
 Shown above the prompt:
 
 ```
-Sonnet 5.5  ◼◼◼◼◼ 12%  5h 8% (34m)  W 13% (4d 2h)  +
+Sonnet 5.5  ◼◼◼◼◼ 12%  5h 8% (34m)  W 13% (4d 2h)  ⎇ feat/invoices @ invoices  +
 ```
 
 - The model, as `/model` shows it, then an icon for the reasoning effort:
@@ -27,6 +28,10 @@ Sonnet 5.5  ◼◼◼◼◼ 12%  5h 8% (34m)  W 13% (4d 2h)  +
 - Each rate-limit window (`5h`, `W`) with its percentage and the time until it
   resets. Windows appear once the first response has reported them, and only on
   a subscription.
+- The git branch after `⎇` and, inside a linked git worktree, `@` and the
+  worktree's name. Both follow the session into and out of worktrees, are read
+  again after each turn, and are shortened to fit the terminal width. Outside a
+  git repository they are left out.
 - Bars and percentages are green, turn yellow at 60% and red at 85%.
 - The button on the right shows `+` while the pane is closed and `−` while it is
   open. Press it to open or close the pane.

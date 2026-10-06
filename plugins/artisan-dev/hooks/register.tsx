@@ -1,7 +1,7 @@
 import type { EngineInterface, Register, RenderChildren } from 'claude-code'
 import { atom, read, update } from 'claude-code'
 
-import type { Dev, DevEvent, Entry, Layout, Proc, Repo } from '../types'
+import type { Dev, DevEvent, Entry, Layout, Proc } from '../types'
 
 const DEFAULT_PORT = 8000
 const PANE = 'dev'
@@ -28,8 +28,6 @@ const BADGES: Record<string, string> = {
 const BADGE_PATTERN = /^\s*(INFO|NOTICE|WARN|WARNING|ERROR|FAIL|DEBUG|INF|WRN|ERR|DBG)\b\s*(.*)$/
 const TIMESTAMP_PATTERN = /^\d{4}-\d\d-\d\dT[\d:.]+Z?\s+/
 const TICK_MS = 5000
-const WHERE_OVERHEAD = 5
-const BAND_RESERVE = 6
 const TOAST_GAP_MS = 15_000
 const TERM_GRACE_MS = 2000
 const RESTART_DELAY_MS = 1000
@@ -58,7 +56,6 @@ const scrollBack = atom({ plugin: 'artisan-dev', key: 'back' } as const, 0)
 const onlyErrors = atom({ plugin: 'artisan-dev', key: 'onlyErrors' } as const, false)
 const tunnel = atom({ plugin: 'artisan-dev', key: 'tunnel' } as const, null)
 const attached = atom({ plugin: 'artisan-dev', key: 'attached' } as const, null)
-const repo = atom({ plugin: 'artisan-dev', key: 'repo' } as const, null)
 const layout = atom({ plugin: 'artisan-dev', key: 'layout' } as const, null)
 
 const WHEEL_STEP = 3
@@ -227,40 +224,6 @@ export const statusText = (name: string, current: Dev, port: number | null, url:
 }
 
 const pickBranch = (named: string, detached: string): string => named.trim() || detached.trim()
-
-export const parseRepo = (revParse: string, branch: string, head: string): Repo | null => {
-  const [toplevel, gitDir, commonDir] = revParse.split('\n').map(line => line.trim())
-
-  if (!toplevel || !gitDir || !commonDir) {
-    return null
-  }
-
-  return {
-    branch: pickBranch(branch, head) || null,
-    worktree: gitDir === commonDir ? null : (toplevel.split('/').filter(Boolean).pop() ?? null),
-  }
-}
-
-export const fitWhere = (where: Repo | null, room: number): { branch: string; worktree: string } => {
-  const names = [where?.branch ?? '', where?.worktree ?? '']
-  const order = names.flatMap((name, slot) => (name ? [{ name, slot }] : [])).sort((a, b) => a.name.length - b.name.length)
-  const shown = ['', '']
-  let left = room - order.length * WHERE_OVERHEAD
-
-  if (left < order.length) {
-    return { branch: '', worktree: '' }
-  }
-
-  order.forEach(({ name, slot }, done) => {
-    const cap = Math.floor(left / (order.length - done))
-    const text = name.length > cap ? `${name.slice(0, cap - 1)}…` : name
-
-    shown[slot] = text
-    left -= text.length
-  })
-
-  return { branch: shown[0] ?? '', worktree: shown[1] ?? '' }
-}
 
 export const parseLayout = (branch: string, head: string, porcelain: string): Layout => ({
   branch: pickBranch(branch, head),
@@ -892,19 +855,12 @@ async function readBranch($: EngineInterface, cwd?: string) {
   return { ok: named.exitCode === 0, named: named.stdout, detached: detached?.stdout ?? '' }
 }
 
-async function refreshRepo($: EngineInterface) {
-  const top = await $.process.run(['git', 'rev-parse', '--path-format=absolute', '--show-toplevel', '--git-dir', '--git-common-dir', '--show-prefix'])
-  const branch = top.exitCode === 0 ? await readBranch($) : null
-  const next = branch ? parseRepo(top.stdout, branch.named, branch.detached) : null
-  const last = await read($, repo)
-  const [toplevel = '', , , prefix = ''] = top.stdout.split('\n').map(line => line.trim())
+async function refreshSite($: EngineInterface) {
+  const top = await $.process.run(['git', 'rev-parse', '--path-format=absolute', '--show-toplevel', '--show-prefix'])
+  const [toplevel = '', prefix = ''] = top.exitCode === 0 ? top.stdout.split('\n').map(line => line.trim()) : []
   siteDir = prefix ? `${toplevel}/${prefix.replace(/\/$/, '')}` : toplevel
 
   await loadAppUrl($)
-
-  if (last?.branch !== next?.branch || last?.worktree !== next?.worktree) {
-    await update($, repo, () => next)
-  }
 }
 
 async function watchLayout($: EngineInterface) {
@@ -950,7 +906,7 @@ function ensureTick($: EngineInterface) {
     const current = await read($, dev)
 
     if (current.status !== 'stopped' || current.procs.length > 0) {
-      await refreshRepo($).catch(() => undefined)
+      await refreshSite($).catch(() => undefined)
       await watchLayout($).catch(() => undefined)
     }
 
@@ -1257,7 +1213,7 @@ async function startAll($: EngineInterface): Promise<boolean> {
     await resetDetection($)
   }
 
-  await refreshRepo($).catch(() => undefined)
+  await refreshSite($).catch(() => undefined)
   await watchLayout($).catch(() => undefined)
   ensureTick($)
   runners.forEach(runner => {
@@ -1416,7 +1372,6 @@ async function carryState($: EngineInterface) {
     detected: await read($, detected),
     tunnel: await read($, tunnel),
     onlyErrors: await read($, onlyErrors),
-    repo: await read($, repo),
     layout: await read($, layout),
   }
 }
@@ -1430,7 +1385,6 @@ async function restoreState($: EngineInterface, carried: Awaited<ReturnType<type
   await update($, detected, () => carried.detected)
   await update($, tunnel, () => carried.tunnel)
   await update($, onlyErrors, () => carried.onlyErrors)
-  await update($, repo, () => carried.repo)
   await update($, layout, () => carried.layout)
   await update($, isOpen, () => false)
   $.ui.status(undefined)
@@ -1765,7 +1719,7 @@ export const register: Register = (on, options) => {
     tick?.cancel()
     tick = null
     await dropAttached($)
-    await refreshRepo($).catch(() => undefined)
+    await refreshSite($).catch(() => undefined)
     await watchLayout($).catch(() => undefined)
     ensureTick($)
 
@@ -1795,7 +1749,7 @@ export const register: Register = (on, options) => {
     const result = await next(e)
 
     $.clock.after(0, () => {
-      void refreshRepo($)
+      void refreshSite($)
         .catch(() => undefined)
         .then(() => watchLayout($))
         .catch(() => undefined)
@@ -1851,17 +1805,12 @@ export const register: Register = (on, options) => {
     const color = statusColor(current.status, up, total)
     const port = effectivePort(await readPorts($))
     const base = await read($, appUrl)
-    const where = await read($, repo)
     const detail = current.status === 'stopped' ? ' stopped' : ` · ${up}/${total} up`
     const host = siteHost(base)
-    const nameLinks = Boolean(where?.worktree && host && current.status !== 'stopped')
     const siteLabel = host ? `${host} ↗` : port ? `:${port} ↗` : '↗ site'
-    const showSite = current.status !== 'stopped' && !nameLinks
+    const showSite = current.status !== 'stopped'
     const openSite = () => openUrl($, siteUrl(base, port))
-    const site = showSite ? 1 + siteLabel.length : 0
     const errorText = errors > 0 ? ` · ${errors} err` : ''
-    const used = ' dev'.length + 1 + site + detail.length + errorText.length + BAND_RESERVE + (nameLinks ? 2 : 0)
-    const shown = fitWhere(where, e.props.bodyColumns - used)
 
     return stack(
       <Box>
@@ -1880,13 +1829,6 @@ export const register: Register = (on, options) => {
         ) : null}
         <Text dimColor>{detail}</Text>
         {errors > 0 ? <Text color="red">{errorText}</Text> : null}
-        {shown.branch ? <Text dimColor>{` · ⎇ ${shown.branch}`}</Text> : null}
-        {shown.worktree ? <Text dimColor>{' · ⌂ '}</Text> : null}
-        {shown.worktree && nameLinks ? (
-          <Button key="dev-worktree" label={`${shown.worktree} ↗`} plain dimColor onPress={openSite} />
-        ) : shown.worktree ? (
-          <Text dimColor>{shown.worktree}</Text>
-        ) : null}
         <Text>  </Text>
         <Button key="dev-toggle" label={open ? '−' : '+'} plain dimColor onPress={() => togglePane($)} />
       </Box>,
