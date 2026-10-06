@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import type { Dev } from '../types'
-import { fitWhere, hasError, layoutChange, parseLayout, parseRepo, pickDir, applyEvent, colorFor, applySgr, buttonGrid, buttonText, clearedLog, color256, afterCarriage, findTunnelUrl, layoutEntry, isProblem, logText, matchProcess, parseHosts, statusText, visibleEntries, effectivePort, gridRows, hasAnsi, logRoom, nextBack, judgeExit, noProcess, parseAnsi, wrapRanges, wrapSegments, parseDevArgs, statusColor, parseDevList, parseEnvPort, parseEnvValue, siteUrl, siteHost, promptText, rule, spawnArgv, toPort, PGID_MARK, splitLines, stripAnsi, summarise, uptime, wrapText } from './register'
+import { hasError, layoutChange, parseLayout, pickDir, applyEvent, colorFor, applySgr, buttonGrid, buttonText, clearedLog, color256, afterCarriage, findTunnelUrl, layoutEntry, isProblem, logText, matchProcess, parseHosts, statusText, visibleEntries, effectivePort, gridRows, hasAnsi, logRoom, nextBack, judgeExit, noProcess, parseAnsi, wrapRanges, wrapSegments, parseDevArgs, statusColor, parseDevList, parseEnvPort, parseEnvValue, siteUrl, siteHost, promptText, rule, spawnArgv, toPort, PGID_MARK, splitLines, stripAnsi, summarise, uptime, wrapText } from './register'
 
 const empty: Dev = { status: 'running', procs: [], feed: [], notes: [] }
 const started = applyEvent(empty, { type: 'start', label: 'server', command: 'php artisan serve', pid: 10, time: '2026-10-03T16:00:00.000Z' })
@@ -443,13 +443,6 @@ test('an ANSI entry is laid out on its visible text, not its escape codes', () =
   expect(layoutEntry(coloured, false, 6, 62)).toMatchObject({ ansi: true, level: null, count: 2 })
 })
 
-test('parses the branch and names a linked worktree', () => {
-  expect(parseRepo('/a/kandu\n/a/kandu/.git\n/a/kandu/.git', 'main\n', '')).toEqual({ branch: 'main', worktree: null })
-  expect(parseRepo('/a/kandu/.claude/worktrees/fix\n/a/kandu/.git/worktrees/fix\n/a/kandu/.git', 'fix-x\n', '')).toEqual({ branch: 'fix-x', worktree: 'fix' })
-  expect(parseRepo('/a/kandu\n/a/kandu/.git\n/a/kandu/.git', '', 'abc123\n')).toEqual({ branch: 'abc123', worktree: null })
-  expect(parseRepo('', '', '')).toBeNull()
-})
-
 test('names the host of a site that is not loopback', () => {
   expect(siteHost('https://kandu-purring-crafting.test')).toBe('kandu-purring-crafting.test')
   expect(siteHost('https://kandu.test:8443/app')).toBe('kandu.test')
@@ -460,15 +453,6 @@ test('names the host of a site that is not loopback', () => {
   expect(siteHost(null)).toBeNull()
 })
 
-test('fits the branch and worktree into the room the band has left', () => {
-  const both = { branch: 'worktree-purring-crafting', worktree: 'purring-crafting' }
-
-  expect(fitWhere(both, 80)).toEqual({ branch: 'worktree-purring-crafting', worktree: 'purring-crafting' })
-  expect(fitWhere(both, 30)).toEqual({ branch: 'worktree-…', worktree: 'purring-c…' })
-  expect(fitWhere({ branch: 'main', worktree: null }, 30)).toEqual({ branch: 'main', worktree: '' })
-  expect(fitWhere(null, 30)).toEqual({ branch: '', worktree: '' })
-  expect(fitWhere(both, 8)).toEqual({ branch: '', worktree: '' })
-})
 
 test('a branch switch or a worktree appearing counts as a change, the first read does not', () => {
   const porcelain = 'worktree /a/kandu\nHEAD abc\nbranch refs/heads/main\n'

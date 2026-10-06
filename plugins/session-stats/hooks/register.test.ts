@@ -5,16 +5,19 @@ import type { Snapshot } from '../types'
 
 import {
   addTurn,
+  bandColumns,
   cacheHit,
   countdown,
   effortIcon,
   fillCells,
+  fitLocation,
   formatDuration,
   levelColor,
   limitLabel,
   limitTitle,
   modelShares,
   parseEffort,
+  parseLocation,
   prettyModel,
   tokensLabel,
 } from './register'
@@ -144,4 +147,36 @@ test('limit labels and token counts are short', () => {
   expect(tokensLabel(950)).toBe('950')
   expect(tokensLabel(24_300)).toBe('24k')
   expect(tokensLabel(1_250_000)).toBe('1.3M')
+})
+
+test('parses the branch and names a linked worktree', () => {
+  expect(parseLocation('/a/kandu\n/a/kandu/.git\n/a/kandu/.git', 'main\n', '')).toEqual({ branch: 'main', worktree: null })
+  expect(parseLocation('/a/kandu/.claude/worktrees/fix\n/a/kandu/.git/worktrees/fix\n/a/kandu/.git', 'fix-x\n', '')).toEqual({ branch: 'fix-x', worktree: 'fix' })
+  expect(parseLocation('/a/kandu\n/a/kandu/.git\n/a/kandu/.git', '', 'abc123\n')).toEqual({ branch: 'abc123', worktree: null })
+  expect(parseLocation('', '', '')).toBeNull()
+})
+
+test('fits the branch and worktree into the room the band has left', () => {
+  const both = { branch: 'worktree-purring-crafting', worktree: 'purring-crafting' }
+
+  expect(fitLocation(both, 80)).toEqual({ branch: 'worktree-purring-crafting', worktree: 'purring-crafting' })
+  expect(fitLocation(both, 30)).toEqual({ branch: 'worktree-p…', worktree: 'purring-cr…' })
+  expect(fitLocation({ branch: 'main', worktree: null }, 30)).toEqual({ branch: 'main', worktree: '' })
+  expect(fitLocation(null, 30)).toEqual({ branch: '', worktree: '' })
+  expect(fitLocation(both, 8)).toEqual({ branch: '', worktree: '' })
+})
+
+test('band columns count what the band draws besides the location', () => {
+  const at = Date.parse('2026-10-06T12:00:00Z')
+  const current: Snapshot = {
+    model: 'claude-opus-5-5',
+    percent: 34,
+    tokens: null,
+    window: 200_000,
+    limits: [{ kind: 'five_hour', percentUsed: 8, resetsAt: new Date(at + 34 * 60_000).toISOString() }],
+    usd: null,
+  }
+
+  expect(bandColumns(current, '●', at)).toBe('Opus 5.5 ●  ◼◼◼◼◼ 34%  5h 8% (34m)  +'.length)
+  expect(bandColumns({ ...current, percent: null, limits: [] }, '', at)).toBe('Opus 5.5  ◼◼◼◼◼ –  +'.length)
 })
