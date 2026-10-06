@@ -16,7 +16,6 @@ export type Totals = {
   byModel: Record<string, number>
 }
 export type Category ={ name: string; tokens: number; kind: 'used' | 'free' | 'buffer' | 'deferred' }
-export type Location = { branch: string | null; worktree: string | null }
 
 declare module 'claude-code' {
   interface PluginState {
@@ -27,7 +26,7 @@ declare module 'claude-code' {
       now: number
       totals: Totals
       effort: string | number | null
-      location: Location | null
+      location: string | null
     }
   }
 }

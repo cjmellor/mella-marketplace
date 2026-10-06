@@ -149,21 +149,18 @@ test('limit labels and token counts are short', () => {
   expect(tokensLabel(1_250_000)).toBe('1.3M')
 })
 
-test('parses the branch and names a linked worktree', () => {
-  expect(parseLocation('/a/kandu\n/a/kandu/.git\n/a/kandu/.git', 'main\n', '')).toEqual({ branch: 'main', worktree: null })
-  expect(parseLocation('/a/kandu/.claude/worktrees/fix\n/a/kandu/.git/worktrees/fix\n/a/kandu/.git', 'fix-x\n', '')).toEqual({ branch: 'fix-x', worktree: 'fix' })
-  expect(parseLocation('/a/kandu\n/a/kandu/.git\n/a/kandu/.git', '', 'abc123\n')).toEqual({ branch: 'abc123', worktree: null })
+test('names a linked worktree, otherwise the branch', () => {
+  expect(parseLocation('/a/kandu\n/a/kandu/.git\n/a/kandu/.git', 'main\n', '')).toBe('main')
+  expect(parseLocation('/a/kandu/.claude/worktrees/fix\n/a/kandu/.git/worktrees/fix\n/a/kandu/.git', 'worktree-fix\n', '')).toBe('fix')
+  expect(parseLocation('/a/kandu\n/a/kandu/.git\n/a/kandu/.git', '', 'abc123\n')).toBe('abc123')
   expect(parseLocation('', '', '')).toBeNull()
 })
 
-test('fits the branch and worktree into the room the band has left', () => {
-  const both = { branch: 'worktree-purring-crafting', worktree: 'purring-crafting' }
-
-  expect(fitLocation(both, 80)).toEqual({ branch: 'worktree-purring-crafting', worktree: 'purring-crafting' })
-  expect(fitLocation(both, 30)).toEqual({ branch: 'worktree-p…', worktree: 'purring-cr…' })
-  expect(fitLocation({ branch: 'main', worktree: null }, 30)).toEqual({ branch: 'main', worktree: '' })
-  expect(fitLocation(null, 30)).toEqual({ branch: '', worktree: '' })
-  expect(fitLocation(both, 8)).toEqual({ branch: '', worktree: '' })
+test('fits the location into the room the band has left', () => {
+  expect(fitLocation('idempotent-stargazing-neumann', 80)).toBe('idempotent-stargazing-neumann')
+  expect(fitLocation('idempotent-stargazing-neumann', 20)).toBe('idempotent-star…')
+  expect(fitLocation('idempotent-stargazing-neumann', 4)).toBe('')
+  expect(fitLocation(null, 30)).toBe('')
 })
 
 test('band columns count what the band draws besides the location', () => {

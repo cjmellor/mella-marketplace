@@ -1,7 +1,7 @@
 import type { EngineInterface, Register, SessionUsage, TurnUsage } from 'claude-code'
 import { atom, read, update } from 'claude-code'
 
-import type { Category, Location, Snapshot, Totals } from '../types'
+import type { Category, Snapshot, Totals } from '../types'
 
 const emptyTotals: Totals = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, turnMs: 0, byModel: {} }
 
@@ -144,38 +144,26 @@ export const toSnapshot = (model: string, usage: SessionUsage): Snapshot => ({
   usd: usage.cost?.usd ?? null,
 })
 
-export const parseLocation = (revParse: string, branch: string, head: string): Location | null => {
+export const parseLocation = (revParse: string, branch: string, head: string): string | null => {
   const [toplevel, gitDir, commonDir] = revParse.split('\n').map(line => line.trim())
 
   if (!toplevel || !gitDir || !commonDir) {
     return null
   }
 
-  return {
-    branch: branch.trim() || head.trim() || null,
-    worktree: gitDir === commonDir ? null : (toplevel.split('/').filter(Boolean).pop() ?? null),
-  }
+  const worktree = gitDir === commonDir ? null : toplevel.split('/').filter(Boolean).pop()
+
+  return worktree || branch.trim() || head.trim() || null
 }
 
-export const fitLocation = (where: Location | null, room: number): { branch: string; worktree: string } => {
-  const names = [where?.branch ?? '', where?.worktree ?? '']
-  const order = names.flatMap((name, slot) => (name ? [{ name, slot }] : [])).sort((a, b) => a.name.length - b.name.length)
-  const shown = ['', '']
-  let left = room - order.length * LOCATION_OVERHEAD
+export const fitLocation = (name: string | null, room: number): string => {
+  const left = room - LOCATION_OVERHEAD
 
-  if (left < order.length) {
-    return { branch: '', worktree: '' }
+  if (!name || left < 1) {
+    return ''
   }
 
-  order.forEach(({ name, slot }, done) => {
-    const cap = Math.floor(left / (order.length - done))
-    const text = name.length > cap ? `${name.slice(0, cap - 1)}…` : name
-
-    shown[slot] = text
-    left -= text.length
-  })
-
-  return { branch: shown[0] ?? '', worktree: shown[1] ?? '' }
+  return name.length > left ? `${name.slice(0, left - 1)}…` : name
 }
 
 export const bandColumns = (current: Snapshot, icon: string, at: number): number => {
@@ -189,7 +177,7 @@ export const bandColumns = (current: Snapshot, icon: string, at: number): number
   return prettyModel(current.model).length + (icon ? icon.length + 1 : 0) + 2 + BAR_CELLS + 1 + percent.length + limits + 3
 }
 
-async function readLocation($: EngineInterface): Promise<Location | null> {
+async function readLocation($: EngineInterface): Promise<string | null> {
   const top = await $.process.run(['git', 'rev-parse', '--path-format=absolute', '--show-toplevel', '--git-dir', '--git-common-dir'])
 
   if (top.exitCode !== 0) {
@@ -204,9 +192,8 @@ async function readLocation($: EngineInterface): Promise<Location | null> {
 
 async function refreshLocation($: EngineInterface) {
   const next = await readLocation($).catch(() => null)
-  const last = await read($, location)
 
-  if (last?.branch !== next?.branch || last?.worktree !== next?.worktree) {
+  if ((await read($, location)) !== next) {
     await update($, location, () => next)
   }
 }
@@ -401,8 +388,7 @@ export const register: Register = on => {
             </Box>
           )
         })}
-        {shown.branch ? <Text dimColor>{`  ⎇ ${shown.branch}`}</Text> : null}
-        {shown.worktree ? <Text dimColor>{` @ ${shown.worktree}`}</Text> : null}
+        {shown ? <Text dimColor>{`  ⎇ ${shown}`}</Text> : null}
         <Text>  </Text>
         <Button key="toggle" label={paneIsOpen ? '−' : '+'} plain dimColor onPress={() => togglePane($)} />
       </Box>
