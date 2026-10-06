@@ -1,6 +1,6 @@
 {
   "name": "session-stats",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Shows the model, context fill and rate-limit usage above the prompt, with a pane that breaks the context window down.",
   "author": { "name": "Chris Mellor" },
   "keywords": ["usage", "context", "rate-limit", "mod", "statusline"],
