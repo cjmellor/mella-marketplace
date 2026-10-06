@@ -5,16 +5,19 @@ import type { Snapshot } from '../types'
 
 import {
   addTurn,
+  bandColumns,
   cacheHit,
   countdown,
   effortIcon,
   fillCells,
+  fitLocation,
   formatDuration,
   levelColor,
   limitLabel,
   limitTitle,
   modelShares,
   parseEffort,
+  parseLocation,
   prettyModel,
   tokensLabel,
 } from './register'
@@ -144,4 +147,33 @@ test('limit labels and token counts are short', () => {
   expect(tokensLabel(950)).toBe('950')
   expect(tokensLabel(24_300)).toBe('24k')
   expect(tokensLabel(1_250_000)).toBe('1.3M')
+})
+
+test('names a linked worktree, otherwise the branch', () => {
+  expect(parseLocation('/a/kandu\n/a/kandu/.git\n/a/kandu/.git', 'main\n', '')).toBe('main')
+  expect(parseLocation('/a/kandu/.claude/worktrees/fix\n/a/kandu/.git/worktrees/fix\n/a/kandu/.git', 'worktree-fix\n', '')).toBe('fix')
+  expect(parseLocation('/a/kandu\n/a/kandu/.git\n/a/kandu/.git', '', 'abc123\n')).toBe('abc123')
+  expect(parseLocation('', '', '')).toBeNull()
+})
+
+test('fits the location into the room the band has left', () => {
+  expect(fitLocation('idempotent-stargazing-neumann', 80)).toBe('idempotent-stargazing-neumann')
+  expect(fitLocation('idempotent-stargazing-neumann', 20)).toBe('idempotent-star…')
+  expect(fitLocation('idempotent-stargazing-neumann', 4)).toBe('')
+  expect(fitLocation(null, 30)).toBe('')
+})
+
+test('band columns count what the band draws besides the location', () => {
+  const at = Date.parse('2026-10-06T12:00:00Z')
+  const current: Snapshot = {
+    model: 'claude-opus-5-5',
+    percent: 34,
+    tokens: null,
+    window: 200_000,
+    limits: [{ kind: 'five_hour', percentUsed: 8, resetsAt: new Date(at + 34 * 60_000).toISOString() }],
+    usd: null,
+  }
+
+  expect(bandColumns(current, '●', at)).toBe('Opus 5.5 ●  ◼◼◼◼◼ 34%  5h 8% (34m)  +'.length)
+  expect(bandColumns({ ...current, percent: null, limits: [] }, '', at)).toBe('Opus 5.5  ◼◼◼◼◼ –  +'.length)
 })

@@ -11,6 +11,7 @@ const isOpen = atom({ plugin: 'session-stats', key: 'isOpen' } as const, false)
 const now = atom({ plugin: 'session-stats', key: 'now' } as const, 0)
 const totals = atom({ plugin: 'session-stats', key: 'totals' } as const, emptyTotals)
 const effort = atom({ plugin: 'session-stats', key: 'effort' } as const, null)
+const location = atom({ plugin: 'session-stats', key: 'location' } as const, null)
 
 const EFFORT_LEVELS = ['low', 'medium', 'high', 'xhigh', 'max'] as const
 const EFFORT_ICONS: Record<(typeof EFFORT_LEVELS)[number], string> = { low: '○', medium: '◐', high: '●', xhigh: '◉', max: '◈' }
@@ -29,6 +30,8 @@ const PANE_BAR_CELLS = 20
 const PANE = 'usage'
 const MAX_PANE_ROWS = 30
 const TICK_MS = 60_000
+const LOCATION_OVERHEAD = 4
+const BAND_RESERVE = 2
 
 type Level = 'green' | 'yellow' | 'red'
 
@@ -141,6 +144,60 @@ export const toSnapshot = (model: string, usage: SessionUsage): Snapshot => ({
   usd: usage.cost?.usd ?? null,
 })
 
+export const parseLocation = (revParse: string, branch: string, head: string): string | null => {
+  const [toplevel, gitDir, commonDir] = revParse.split('\n').map(line => line.trim())
+
+  if (!toplevel || !gitDir || !commonDir) {
+    return null
+  }
+
+  const worktree = gitDir === commonDir ? null : toplevel.split('/').filter(Boolean).pop()
+
+  return worktree || branch.trim() || head.trim() || null
+}
+
+export const fitLocation = (name: string | null, room: number): string => {
+  const left = room - LOCATION_OVERHEAD
+
+  if (!name || left < 1) {
+    return ''
+  }
+
+  return name.length > left ? `${name.slice(0, left - 1)}…` : name
+}
+
+export const bandColumns = (current: Snapshot, icon: string, at: number): number => {
+  const percent = current.percent === null ? '–' : `${current.percent}%`
+  const limits = current.limits.reduce((sum, limit) => {
+    const left = countdown(limit.resetsAt, at)
+
+    return sum + 2 + limitLabel(limit.kind).length + 1 + `${Math.round(limit.percentUsed)}%`.length + (left ? left.length + 3 : 0)
+  }, 0)
+
+  return prettyModel(current.model).length + (icon ? icon.length + 1 : 0) + 2 + BAR_CELLS + 1 + percent.length + limits + 3
+}
+
+async function readLocation($: EngineInterface): Promise<string | null> {
+  const top = await $.process.run(['git', 'rev-parse', '--path-format=absolute', '--show-toplevel', '--git-dir', '--git-common-dir'])
+
+  if (top.exitCode !== 0) {
+    return null
+  }
+
+  const named = await $.process.run(['git', 'branch', '--show-current'])
+  const detached = named.exitCode === 0 && !named.stdout.trim() ? await $.process.run(['git', 'rev-parse', '--short', 'HEAD']) : null
+
+  return parseLocation(top.stdout, named.exitCode === 0 ? named.stdout : '', detached?.stdout ?? '')
+}
+
+async function refreshLocation($: EngineInterface) {
+  const next = await readLocation($).catch(() => null)
+
+  if ((await read($, location)) !== next) {
+    await update($, location, () => next)
+  }
+}
+
 async function refresh($: EngineInterface) {
   const usage = await $.session.usage()
   const model = await $.session.model()
@@ -196,6 +253,7 @@ const RESEED_MS = 500
 async function seed($: EngineInterface) {
   await update($, isOpen, () => false)
   await refresh($)
+  await refreshLocation($)
   ticker?.cancel()
   ticker = await $.clock.every(TICK_MS, () => tick($))
 }
@@ -281,8 +339,19 @@ export const register: Register = on => {
     }
 
     await refresh($)
+    await refreshLocation($)
 
     return next(e)
+  })
+
+  on('tool.call', { tool: ['EnterWorktree', 'ExitWorktree'] }, async ($, e, next) => {
+    const result = await next(e)
+
+    $.clock.after(0, () => {
+      void refreshLocation($).catch(() => undefined)
+    })
+
+    return result
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
@@ -297,6 +366,7 @@ export const register: Register = on => {
     const at = await read($, now)
     const paneIsOpen = await read($, isOpen)
     const icon = effortIcon(await read($, effort))
+    const shown = fitLocation(await read($, location), e.props.bodyColumns - bandColumns(current, icon, at) - BAND_RESERVE)
 
     const band = (
       <Box>
@@ -318,6 +388,7 @@ export const register: Register = on => {
             </Box>
           )
         })}
+        {shown ? <Text dimColor>{`  ⎇ ${shown}`}</Text> : null}
         <Text>  </Text>
         <Button key="toggle" label={paneIsOpen ? '−' : '+'} plain dimColor onPress={() => togglePane($)} />
       </Box>

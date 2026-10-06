@@ -26,6 +26,7 @@ declare module 'claude-code' {
       now: number
       totals: Totals
       effort: string | number | null
+      location: string | null
     }
   }
 }

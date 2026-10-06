@@ -37,14 +37,14 @@ Override it for the session with `--port=8111`, `-p 8111` or `port=8111` on `/de
 
 The override lives in the session only. It is never written to `.env`, and it stays in place until you reset it or the session ends.
 
-The site opens at `APP_URL` from the `.env` of the checkout the session is in, so inside a worktree it is that worktree's site. A loopback `APP_URL` (`localhost` or `127.0.0.1`) gets the real port; any other host is used as written. The band link is labelled with that host (`kandu.test ↗`), or `:port ↗` for a loopback `APP_URL`. In a worktree with a hosted `APP_URL`, the worktree name in the band is the link instead.
+The site opens at `APP_URL` from the `.env` of the checkout the session is in, so inside a worktree it is that worktree's site. A loopback `APP_URL` (`localhost` or `127.0.0.1`) gets the real port; any other host is used as written. The band link is labelled with that host (`kandu.test ↗`), or `:port ↗` for a loopback `APP_URL`.
 
 ### The pane
 
 - **Processes** — `0` shows the combined log in arrival order; `1`–`9` pick a process. The up and down arrows move between process names only.
 - **Toolbar** — `x` Stop all (or `s` Start all), `r` Restart all, `t` Restart one (the selected process), `o` Open site, `u` Copy tunnel (shown once a tunnel URL is known), `c` Copy log, `a` Ask Claude (attaches the state and recent output to your next prompt; the button then reads `asked ✓` and drops it).
 - **Log** — keeps each process's own colours, wraps long lines, and scrolls with the wheel, page keys, Home and End. `e` (or the button in the Log divider) shows only errors and warnings.
-- **Band above the prompt** — status dot, a clickable site link (see Port above), how many processes are up, an error count, the git branch (`⎇`) and, inside a linked git worktree, its name (`⌂`). `+` and `−` open and close the pane.
+- **Band above the prompt** — status dot, a clickable site link (see Port above), how many processes are up and an error count. `+` and `−` open and close the pane.
 
 ### Errors
 
