@@ -34,7 +34,7 @@ Mods are plugins that put live UI inside Claude Code: a band above the prompt, a
 |-----|--------------|--------------|
 | `git-diff` | Keeps uncommitted changes in view: a band above the prompt shows files changed, lines added and removed and the current branch, and a pane lists every changed file as a flat list or a folder tree. | `/git-diff`, or the `+` button on the band |
 | `session-stats` | Shows the model, reasoning effort, context fill and rate-limit usage above the prompt, so you can drop a `statusline` script for them. The pane breaks the context window down. | `/session-stats`, or the `+` button on the band |
-| `artisan-dev` | Runs a Laravel app's `php artisan dev` from inside the session: per-process logs, restart and stop controls, a port override, site and tunnel links, and server state you can attach to your next prompt. | `/dev` |
+| `artisan-dev` | Runs a Laravel app's `php artisan dev` from inside the session: per-process logs, restart and stop controls, a port override, the site link, a public tunnel whose links it checks, and server state you can attach to your next prompt. | `/dev` |
 | `worktree-ready` | Makes a new git worktree of a Laravel app ready with no hands: copy-on-write clones of `vendor`, `node_modules` and built assets, a Valet or Herd HTTPS site for it, and clean-up when Claude leaves the worktree. | Runs on its own when Claude enters or exits a worktree |
 
 See each mod's README for details: [`git-diff`](plugins/git-diff/README.md), [`session-stats`](plugins/session-stats/README.md), [`artisan-dev`](plugins/artisan-dev/README.md), [`worktree-ready`](plugins/worktree-ready/README.md).

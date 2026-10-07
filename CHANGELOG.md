@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.21.0] - 2026-10-07
+
+### Added
+
+- **A checked public tunnel in `artisan-dev`** (artisan-dev → v0.4.0). `/dev tunnel open` (`n` in the pane) opens a Cloudflare quick tunnel to the checkout the servers run from, for a browser that is not on your machine. It holds the Vite dev process stopped, builds the assets, and serves the app through its own `php artisan serve` with no Host rewrite. Before it offers **Copy tunnel**, it asks that serve for the page as the tunnel would deliver it and lists any link that points away from the tunnel, with the fix each kind needs in the app. It never edits `.env`. `/dev tunnel close`, leaving the checkout or ending the session closes the tunnel and starts Vite again. A tunnel URL printed by a dev process is still copied, marked as unchecked. Needs `cloudflared`.
+
+### Changed
+
+- **Generic example app names** (mella → v1.16.2). The `worktree-setup` skill, the plugin READMEs and the tests use a made-up app instead of real project names.
+
 ## [1.20.1] - 2026-10-06
 
 ### Fixed

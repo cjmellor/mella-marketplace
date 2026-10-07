@@ -1,7 +1,7 @@
 {
   "name": "artisan-dev",
-  "version": "0.3.1",
-  "description": "Runs `php artisan dev` for a Laravel project and manages it from a pane: per-process logs, restart and stop controls, port override, site and tunnel links.",
+  "version": "0.4.0",
+  "description": "Runs `php artisan dev` for a Laravel project and manages it from a pane: per-process logs, restart and stop controls, port override, the site link, and a public tunnel whose links it checks.",
   "author": { "name": "Chris Mellor" },
   "keywords": ["laravel", "dev-server", "pane", "mod", "artisan"],
   "license": "MIT",
