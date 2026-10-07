@@ -1013,7 +1013,7 @@ async function followCheckout($: EngineInterface): Promise<boolean> {
 
   const moved = project.dir !== ''
 
-  if (await closeTunnel($, false)) {
+  if (moved && (await closeTunnel($, false))) {
     $.ui.toast('Tunnel closed — the session left its checkout', { timeoutMs: 6000 })
   }
 
@@ -1814,6 +1814,10 @@ async function startShare($: EngineInterface): Promise<Share | null> {
   }
 
   const free = await freePort($)
+
+  if (turn !== shareTurn) {
+    return null
+  }
 
   if (!free) {
     return failShare($, turn, `no free port from ${SHARE_PORTS.first} to ${SHARE_PORTS.first + SHARE_PORTS.count - 1}`)
