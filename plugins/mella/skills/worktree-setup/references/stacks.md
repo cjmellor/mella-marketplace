@@ -2,7 +2,7 @@
 
 Each section fills in the stack-specific parts of the worktree-setup steps: the config paths for `.worktreeinclude`, the `deps=(…)` and `install()` lines for the provisioning hook, the MCP marker, and a smoke command for verification. Mixed projects combine sections. For a stack with no section, derive the same parts from its lockfile and ignore file, then add a section here.
 
-## Laravel — verified (Kandu)
+## Laravel — verified
 
 - **Config**: `.env`, `auth.json` (private Composer repo credentials such as Flux Pro; without it `composer install` fails with 401), `.mcp.json`, `boost.json`, `.ai/guidelines/`, any gitignored docs the agent reads, `.claude/settings.local.json`, `public/build/`.
 - **Hook**:

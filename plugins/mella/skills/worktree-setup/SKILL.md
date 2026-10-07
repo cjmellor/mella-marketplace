@@ -7,7 +7,7 @@ description: Provision a project so every new git worktree starts ready to work 
 
 A **provisioned** worktree is one a fresh session works in immediately: the same config, dependencies, plugins and MCP servers as the checkout it branched from, nothing installed by hand, and a clean `git status`.
 
-Findings are verified on Claude Code 2.1.283 against a Laravel app (Kandu, `~/Dev/Private/projects/kandu`, commit `906781a`) unless marked **inferred** or **untested**. Several contradict the Claude Code docs, so after a Claude Code upgrade re-run step 7 before trusting them.
+Findings are verified on Claude Code 2.1.283 against a real Laravel app unless marked **inferred** or **untested**. Several contradict the Claude Code docs, so after a Claude Code upgrade re-run step 7 before trusting them.
 
 Work from the project's **main checkout** throughout. It is the single source every worktree inherits from: personal config lives in files that `.worktreeinclude` copies, dependencies are cloned from it, and hooks and MCP overrides point at scripts inside it.
 
@@ -79,12 +79,12 @@ Copy [templates/worktree-deps.sh](templates/worktree-deps.sh) to `.claude/hooks/
 What the script guarantees:
 
 - Exits at once in the main checkout, outside git, and when every dependency tree already exists, so running on every session start costs nothing.
-- Clones each missing tree from the main checkout with `cp -c -R`, an APFS clone (macOS): blocks are shared until written, and symlinks and nested repos survive. In Kandu that took 11s and 18 MB, against 680 MB for a byte copy. On Linux, swap in `cp -a --reflink=auto` (**untested**).
+- Clones each missing tree from the main checkout with `cp -c -R`, an APFS clone (macOS): blocks are shared until written, and symlinks and nested repos survive. In the test app that took 11s and 18 MB, against 680 MB for a byte copy. On Linux, swap in `cp -a --reflink=auto` (**untested**).
 - Then runs the package managers against the worktree's own lockfiles, which reconciles branch differences (verified: a branch on Laravel 13.32 was cloned from a main checkout on 13.29 and came out on 13.32).
 - Holds `$git_dir/deps.lock` while working, so the two events never double-run and step 6 can wait on it.
 - Prints one line on success, which lands in Claude's context on `SessionStart`; install output goes to `$git_dir/worktree-deps.log`.
 
-Clone rather than symlink dependency trees: tools that resolve the project root through the dependency path break on a symlink (Pest did in Kandu).
+Clone rather than symlink dependency trees: tools that resolve the project root through the dependency path break on a symlink (Pest did in the test app).
 
 Done when a hand run on a throwaway worktree (`git worktree add`, then `echo '{"cwd":"<worktree path>"}' | .claude/hooks/worktree-deps.sh`) exits 0 and prints the ready line, a second run exits 0 silently, and the stack's smoke command works in that worktree. Remove the throwaway worktree afterwards.
 
@@ -137,4 +137,4 @@ Commit `.worktreeinclude`, `.claude/hooks/worktree-deps.sh` and any `.claude/scr
 
 - The auto-mode classifier may refuse edits to Claude settings files as self-modification. Give the user the exact JSON to paste and carry on with the rest; a denial covers the outcome, so another tool or route is off the table.
 - `jq '… | keys?'` on a missing key prints nothing at all, which makes a populated file look empty. Select the fields explicitly.
-- Builds in a worktree run only the asset step. A build that also regenerates tracked files (Kandu's `vp run build` chains Maizzle over `resources/views/mail/compiled`) dirties the tree; copy its output through `.worktreeinclude` instead, and run the asset-only command (`vp build`) when a rebuild is genuinely needed.
+- Builds in a worktree run only the asset step. A build that also regenerates tracked files (for example a `build` script that also runs Maizzle over `resources/views/mail/compiled`) dirties the tree; copy its output through `.worktreeinclude` instead, and run the asset-only command (such as `vite build`) when a rebuild is genuinely needed.

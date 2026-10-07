@@ -154,9 +154,9 @@ test('limit labels and token counts are short', () => {
 })
 
 test('names a linked worktree, otherwise the branch', () => {
-  expect(parseLocation('/a/kandu\n/a/kandu/.git\n/a/kandu/.git', 'main\n', '')).toBe('main')
-  expect(parseLocation('/a/kandu/.claude/worktrees/fix\n/a/kandu/.git/worktrees/fix\n/a/kandu/.git', 'worktree-fix\n', '')).toBe('fix')
-  expect(parseLocation('/a/kandu\n/a/kandu/.git\n/a/kandu/.git', '', 'abc123\n')).toBe('abc123')
+  expect(parseLocation('/a/acme\n/a/acme/.git\n/a/acme/.git', 'main\n', '')).toBe('main')
+  expect(parseLocation('/a/acme/.claude/worktrees/fix\n/a/acme/.git/worktrees/fix\n/a/acme/.git', 'worktree-fix\n', '')).toBe('fix')
+  expect(parseLocation('/a/acme\n/a/acme/.git\n/a/acme/.git', '', 'abc123\n')).toBe('abc123')
   expect(parseLocation('', '', '')).toBeNull()
 })
 
