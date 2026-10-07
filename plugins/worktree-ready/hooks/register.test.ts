@@ -1,9 +1,9 @@
 import { expect, mock, test } from 'claude-code/testing'
 
-const MAIN = '/m/kandu'
-const TREE = '/m/kandu/.claude/worktrees/purring-crafting'
-const GIT_DIR = '/m/kandu/.git/worktrees/purring-crafting'
-const NAME = 'kandu-purring-crafting'
+const MAIN = '/m/acme'
+const TREE = '/m/acme/.claude/worktrees/blue-heron'
+const GIT_DIR = '/m/acme/.git/worktrees/blue-heron'
+const NAME = 'acme-blue-heron'
 const REV = `${TREE}\n${GIT_DIR}\n${MAIN}/.git\n`
 
 type Site = { name: string; path: string; secure: boolean }
@@ -40,10 +40,10 @@ const world = (overrides: Partial<World> = {}): World => ({
     `${MAIN}/vendor`, `${MAIN}/node_modules`, `${MAIN}/public/build`, `${MAIN}/.env`, TREE,
   ]),
   texts: new Map([
-    [`${MAIN}/.env`, 'APP_NAME=Kandu\nAPP_URL=http://kandu.test\n'],
+    [`${MAIN}/.env`, 'APP_NAME=Acme\nAPP_URL=http://acme.test\n'],
     [`${TREE}/package.json`, '{"scripts":{"build":"vite build"}}'],
   ]),
-  sites: [{ name: 'kandu', path: MAIN, secure: true }],
+  sites: [{ name: 'acme', path: MAIN, secure: true }],
   calls: [],
   store: new Map(),
   toasts: [],
@@ -85,7 +85,7 @@ const respond = (w: World, argv: string[], cwd: string | undefined) => {
     return ok()
   }
   if (line.startsWith('stat -f')) return ok(`${w.lockMade}\n`)
-  if (line === 'git rev-parse --abbrev-ref HEAD') return ok('worktree-purring-crafting\n')
+  if (line === 'git rev-parse --abbrev-ref HEAD') return ok('worktree-blue-heron\n')
   if (line.startsWith(`git -C ${MAIN} diff --quiet`)) return w.sameAssets ? ok() : fail()
   if (line === 'git status --porcelain') return w.statusFails ? fail() : ok(w.dirty ? ' M app/User.php\n' : '')
   if (line.startsWith('git -C') && line.includes('symbolic-ref')) return ok('origin/main\n')
@@ -157,7 +157,7 @@ const stubWorld = (on: (name: string, hook: (...args: any[]) => unknown) => void
 const enter = (w: World) => () => {
   w.files.add(TREE)
 
-  return { result: { worktreePath: TREE, worktreeBranch: 'worktree-purring-crafting', message: 'Switched' } }
+  return { result: { worktreePath: TREE, worktreeBranch: 'worktree-blue-heron', message: 'Switched' } }
 }
 
 const leave = (action: string) => () => ({ result: { action, originalCwd: MAIN, worktreePath: TREE } })
@@ -169,17 +169,17 @@ test('entering a worktree whose lockfiles and assets match main clones, installs
 
   stubWorld(on, w)
   on('tool.call', enter(w))
-  const entered = (await $.tool.call({ tool: 'EnterWorktree', name: 'purring-crafting' })) as { context?: string[] }
+  const entered = (await $.tool.call({ tool: 'EnterWorktree', name: 'blue-heron' })) as { context?: string[] }
 
-  expect(w.logs).toEqual([`purring-crafting is served at https://${NAME}.test`])
+  expect(w.logs).toEqual([`blue-heron is served at https://${NAME}.test`])
   expect(entered.context?.join(' ')).toContain(`https://${NAME}.test`)
   expect(ran(w, 'cp -c -R')).toEqual([`cp -c -R ${MAIN}/vendor ${TREE}/vendor`, `cp -c -R ${MAIN}/node_modules ${TREE}/node_modules`, `cp -c -R ${MAIN}/public/build ${TREE}/public/build`])
   expect(ran(w, 'composer')).toEqual([])
   expect(ran(w, 'bun')).toEqual([])
   expect(ran(w, 'valet link ')).toEqual([`valet link ${NAME}`])
   expect(ran(w, 'valet secure')).toEqual([`valet secure ${NAME}`])
-  expect(w.texts.get(`${TREE}/.env`)).toBe(`APP_NAME=Kandu\nAPP_URL=https://${NAME}.test\n`)
-  expect(w.store.get(`wt:${TREE}`)).toMatchObject({ link: NAME, tool: 'valet', state: 'active', branch: 'worktree-purring-crafting' })
+  expect(w.texts.get(`${TREE}/.env`)).toBe(`APP_NAME=Acme\nAPP_URL=https://${NAME}.test\n`)
+  expect(w.store.get(`wt:${TREE}`)).toMatchObject({ link: NAME, tool: 'valet', state: 'active', branch: 'worktree-blue-heron' })
   expect(w.toasts).toContain(`Worktree ready at https://${NAME}.test`)
 })
 
@@ -191,9 +191,9 @@ test('points Vite at the secured site certificate so the dev server runs on http
   w.files.add(`${cert}.crt`)
   stubWorld(on, w)
   on('tool.call', enter(w))
-  await $.tool.call({ tool: 'EnterWorktree', name: 'purring-crafting' })
+  await $.tool.call({ tool: 'EnterWorktree', name: 'blue-heron' })
 
-  expect(w.texts.get(`${TREE}/.env`)).toBe(`APP_NAME=Kandu\nAPP_URL=https://${NAME}.test\nVITE_DEV_SERVER_KEY=${cert}.key\nVITE_DEV_SERVER_CERT=${cert}.crt\n`)
+  expect(w.texts.get(`${TREE}/.env`)).toBe(`APP_NAME=Acme\nAPP_URL=https://${NAME}.test\nVITE_DEV_SERVER_KEY=${cert}.key\nVITE_DEV_SERVER_CERT=${cert}.crt\n`)
 })
 
 test('a changed lockfile installs, and changed frontend sources rebuild', async ($, on) => {
@@ -201,7 +201,7 @@ test('a changed lockfile installs, and changed frontend sources rebuild', async 
 
   stubWorld(on, w)
   on('tool.call', enter(w))
-  await $.tool.call({ tool: 'EnterWorktree', name: 'purring-crafting' })
+  await $.tool.call({ tool: 'EnterWorktree', name: 'blue-heron' })
 
   expect(ran(w, 'composer install')).toEqual(['composer install --no-interaction'])
   expect(ran(w, 'bun install')).toEqual(['bun install --frozen-lockfile'])
@@ -214,7 +214,7 @@ test('a main checkout with no built assets forces a build', async ($, on) => {
   w.files.delete(`${MAIN}/public/build`)
   stubWorld(on, w)
   on('tool.call', enter(w))
-  await $.tool.call({ tool: 'EnterWorktree', name: 'purring-crafting' })
+  await $.tool.call({ tool: 'EnterWorktree', name: 'blue-heron' })
 
   expect(ran(w, 'bun run build')).toEqual(['bun run build'])
 })
@@ -225,11 +225,11 @@ test('a site name that already points elsewhere is never overwritten', async ($,
   w.sites.push({ name: NAME, path: '/somewhere/else', secure: true })
   stubWorld(on, w)
   on('tool.call', enter(w))
-  await $.tool.call({ tool: 'EnterWorktree', name: 'purring-crafting' })
+  await $.tool.call({ tool: 'EnterWorktree', name: 'blue-heron' })
 
   expect(ran(w, 'valet link ')).toEqual([])
   expect(w.sites.find(site => site.name === NAME)?.path).toBe('/somewhere/else')
-  expect(w.texts.get(`${TREE}/.env`)).toBe('APP_NAME=Kandu\nAPP_URL=http://kandu.test\n')
+  expect(w.texts.get(`${TREE}/.env`)).toBe('APP_NAME=Acme\nAPP_URL=http://acme.test\n')
 })
 
 test('with both tools installed and no choice made, nothing is linked and the user is told', async ($, on) => {
@@ -237,7 +237,7 @@ test('with both tools installed and no choice made, nothing is linked and the us
 
   stubWorld(on, w)
   on('tool.call', enter(w))
-  await $.tool.call({ tool: 'EnterWorktree', name: 'purring-crafting' })
+  await $.tool.call({ tool: 'EnterWorktree', name: 'blue-heron' })
 
   expect(ran(w, 'valet link ')).toEqual([])
   expect(w.toasts.some(text => text.includes('both installed'))).toBe(true)
@@ -249,7 +249,7 @@ test('a main checkout that is not a Laravel worktree is left alone', async ($, o
   w.files.delete(`${TREE}/artisan`)
   stubWorld(on, w)
   on('tool.call', enter(w))
-  await $.tool.call({ tool: 'EnterWorktree', name: 'purring-crafting' })
+  await $.tool.call({ tool: 'EnterWorktree', name: 'blue-heron' })
 
   expect(ran(w, 'cp')).toEqual([])
   expect(w.store.size).toBe(0)
@@ -260,7 +260,7 @@ test('leaving a finished worktree unsecures, unlinks, verifies, then removes the
 
   stubWorld(on, w)
   on('tool.call', ($: unknown, e: { tool: string }) => (e.tool === 'EnterWorktree' ? enter(w)() : leave('keep')()))
-  await $.tool.call({ tool: 'EnterWorktree', name: 'purring-crafting' })
+  await $.tool.call({ tool: 'EnterWorktree', name: 'blue-heron' })
   w.head = 'def456'
   w.calls.length = 0
   await $.tool.call({ tool: 'ExitWorktree', action: 'keep' })
@@ -269,7 +269,7 @@ test('leaving a finished worktree unsecures, unlinks, verifies, then removes the
   expect(ran(w, 'valet unlink')).toEqual([`valet unlink ${NAME}`])
   expect(w.sites.some(site => site.name === NAME)).toBe(false)
   expect(ran(w, `git -C ${MAIN} worktree remove`)).toEqual([`git -C ${MAIN} worktree remove ${TREE}`])
-  expect(ran(w, `git -C ${MAIN} branch -d`)).toEqual([`git -C ${MAIN} branch -d worktree-purring-crafting`])
+  expect(ran(w, `git -C ${MAIN} branch -d`)).toEqual([`git -C ${MAIN} branch -d worktree-blue-heron`])
   expect(w.store.has(`wt:${TREE}`)).toBe(false)
 })
 
@@ -278,7 +278,7 @@ test('leaving a worktree with uncommitted work unlinks it but keeps the folder, 
 
   stubWorld(on, w)
   on('tool.call', ($: unknown, e: { tool: string }) => (e.tool === 'EnterWorktree' ? enter(w)() : leave('keep')()))
-  await $.tool.call({ tool: 'EnterWorktree', name: 'purring-crafting' })
+  await $.tool.call({ tool: 'EnterWorktree', name: 'blue-heron' })
   await $.tool.call({ tool: 'ExitWorktree', action: 'keep' })
 
   expect(w.sites.some(site => site.name === NAME)).toBe(false)
@@ -292,7 +292,7 @@ test('a worktree whose branch is not merged is kept', async ($, on) => {
 
   stubWorld(on, w)
   on('tool.call', ($: unknown, e: { tool: string }) => (e.tool === 'EnterWorktree' ? enter(w)() : leave('keep')()))
-  await $.tool.call({ tool: 'EnterWorktree', name: 'purring-crafting' })
+  await $.tool.call({ tool: 'EnterWorktree', name: 'blue-heron' })
   await $.tool.call({ tool: 'ExitWorktree', action: 'keep' })
 
   expect(ran(w, `git -C ${MAIN} worktree remove`)).toEqual([])
@@ -304,7 +304,7 @@ test('a worktree entered and left without a commit is kept, even though main con
 
   stubWorld(on, w)
   on('tool.call', ($: unknown, e: { tool: string }) => (e.tool === 'EnterWorktree' ? enter(w)() : leave('keep')()))
-  await $.tool.call({ tool: 'EnterWorktree', name: 'purring-crafting' })
+  await $.tool.call({ tool: 'EnterWorktree', name: 'blue-heron' })
   await $.tool.call({ tool: 'ExitWorktree', action: 'keep' })
 
   expect(w.sites.some(site => site.name === NAME)).toBe(false)
@@ -316,7 +316,7 @@ test('a worktree whose git status fails is treated as dirty', async ($, on) => {
 
   stubWorld(on, w)
   on('tool.call', ($: unknown, e: { tool: string }) => (e.tool === 'EnterWorktree' ? enter(w)() : leave('keep')()))
-  await $.tool.call({ tool: 'EnterWorktree', name: 'purring-crafting' })
+  await $.tool.call({ tool: 'EnterWorktree', name: 'blue-heron' })
   await $.tool.call({ tool: 'ExitWorktree', action: 'keep' })
 
   expect(ran(w, `git -C ${MAIN} worktree remove`)).toEqual([])
@@ -341,7 +341,7 @@ test('a setup lock left behind by a dead session is cleared once it is old', asy
   await clock.advance(3_600_000)
   stubWorld(on, w)
   on('tool.call', enter(w))
-  await $.tool.call({ tool: 'EnterWorktree', name: 'purring-crafting' })
+  await $.tool.call({ tool: 'EnterWorktree', name: 'blue-heron' })
 
   expect(ran(w, 'valet link ')).toEqual([`valet link ${NAME}`])
 })
@@ -352,7 +352,7 @@ test('a fresh lock means another setup is running', async ($, on) => {
 
   stubWorld(on, w)
   on('tool.call', enter(w))
-  await $.tool.call({ tool: 'EnterWorktree', name: 'purring-crafting' })
+  await $.tool.call({ tool: 'EnterWorktree', name: 'blue-heron' })
 
   expect(ran(w, 'valet link ')).toEqual([])
   expect(w.toasts.some(text => text.includes('another setup'))).toBe(true)
@@ -364,7 +364,7 @@ test('main\'s storage link is recreated in the worktree', async ($, on) => {
   w.files.add(`${MAIN}/public/storage`)
   stubWorld(on, w)
   on('tool.call', enter(w))
-  await $.tool.call({ tool: 'EnterWorktree', name: 'purring-crafting' })
+  await $.tool.call({ tool: 'EnterWorktree', name: 'blue-heron' })
 
   expect(ran(w, 'php artisan storage:link')).toEqual(['php artisan storage:link'])
 })
@@ -374,7 +374,7 @@ test('when the tool removes the worktree itself, only the link and record are cl
 
   stubWorld(on, w)
   on('tool.call', ($: unknown, e: { tool: string }) => (e.tool === 'EnterWorktree' ? enter(w)() : leave('remove')()))
-  await $.tool.call({ tool: 'EnterWorktree', name: 'purring-crafting' })
+  await $.tool.call({ tool: 'EnterWorktree', name: 'blue-heron' })
   await $.tool.call({ tool: 'ExitWorktree', action: 'remove' })
 
   expect(w.sites.some(site => site.name === NAME)).toBe(false)
@@ -387,7 +387,7 @@ test('an exit the tool refused leaves the link and the record alone', async ($, 
 
   stubWorld(on, w)
   on('tool.call', ($: unknown, e: { tool: string }) => (e.tool === 'EnterWorktree' ? enter(w)() : { result: 'refused: uncommitted changes' }))
-  await $.tool.call({ tool: 'EnterWorktree', name: 'purring-crafting' })
+  await $.tool.call({ tool: 'EnterWorktree', name: 'blue-heron' })
   w.calls.length = 0
   await $.tool.call({ tool: 'ExitWorktree', action: 'remove' })
 
@@ -400,15 +400,15 @@ test('the next session removes a worktree that was left exited, and leaves links
   const w = world({ head: 'def456' })
   const clock = mock.clock(on)
 
-  w.sites.push({ name: 'kandu-ghost', path: `${MAIN}/.claude/worktrees/ghost`, secure: true })
+  w.sites.push({ name: 'acme-ghost', path: `${MAIN}/.claude/worktrees/ghost`, secure: true })
   w.sites.push({ name: NAME, path: TREE, secure: true })
-  w.store.set(`wt:${TREE}`, { path: TREE, main: MAIN, project: 'kandu', branch: 'worktree-purring-crafting', base: 'abc123', tool: 'valet', link: NAME, state: 'exited', notified: false })
+  w.store.set(`wt:${TREE}`, { path: TREE, main: MAIN, project: 'acme', branch: 'worktree-blue-heron', base: 'abc123', tool: 'valet', link: NAME, state: 'exited', notified: false })
   stubWorld(on, w)
   on('session.start', () => ({ cwd: MAIN }))
   await $.session.start({ surface: 'terminal', isInteractive: true, cwd: MAIN })
   await clock.advance(1)
 
-  expect(w.sites.map(site => site.name)).toEqual(['kandu', 'kandu-ghost'])
+  expect(w.sites.map(site => site.name)).toEqual(['acme', 'acme-ghost'])
   expect(ran(w, `git -C ${MAIN} worktree remove`)).toEqual([`git -C ${MAIN} worktree remove ${TREE}`])
   expect(w.store.has(`wt:${TREE}`)).toBe(false)
 })
@@ -418,10 +418,10 @@ test('a worktree .env copied in earlier still gets main\'s sqlite file, and the 
 
   w.files.add(`${MAIN}/database/database.sqlite`)
   w.files.add(`${TREE}/.env`)
-  w.texts.set(`${TREE}/.env`, 'DB_CONNECTION=sqlite\nAPP_URL=http://kandu.test\n')
+  w.texts.set(`${TREE}/.env`, 'DB_CONNECTION=sqlite\nAPP_URL=http://acme.test\n')
   stubWorld(on, w)
   on('tool.call', enter(w))
-  await $.tool.call({ tool: 'EnterWorktree', name: 'purring-crafting' })
+  await $.tool.call({ tool: 'EnterWorktree', name: 'blue-heron' })
 
   expect(w.cwd).toBe(MAIN)
   expect(w.texts.get(`${TREE}/.env`)).toBe(`DB_CONNECTION=sqlite\nAPP_URL=https://${NAME}.test\nDB_DATABASE=${MAIN}/database/database.sqlite\n`)

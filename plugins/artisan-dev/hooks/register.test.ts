@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
-import type { Dev } from '../types'
-import { hasError, layoutChange, parseLayout, pickDir, applyEvent, colorFor, applySgr, buttonGrid, buttonText, clearedLog, color256, afterCarriage, findTunnelUrl, layoutEntry, isProblem, logText, matchProcess, parseHosts, statusText, visibleEntries, effectivePort, gridRows, hasAnsi, logRoom, nextBack, judgeExit, noProcess, parseAnsi, wrapRanges, wrapSegments, parseDevArgs, statusColor, parseDevList, parseEnvPort, parseEnvValue, siteUrl, siteHost, promptText, rule, spawnArgv, toPort, PGID_MARK, splitLines, stripAnsi, summarise, uptime, wrapText } from './register'
+import type { Dev, Share } from '../types'
+import { assetUrls, buildArgv, findLeftovers, isViteCommand, localPath, readCurl, shareBand, shareReport, hasError, layoutChange, parseLayout, pickDir, applyEvent, colorFor, applySgr, buttonGrid, buttonText, clearedLog, color256, afterCarriage, findTunnelUrl, layoutEntry, isProblem, logText, matchProcess, parseHosts, statusText, visibleEntries, effectivePort, gridRows, hasAnsi, logRoom, nextBack, judgeExit, noProcess, parseAnsi, wrapRanges, wrapSegments, parseDevArgs, statusColor, parseDevList, parseEnvPort, parseEnvValue, siteUrl, siteHost, promptText, rule, spawnArgv, toPort, PGID_MARK, splitLines, stripAnsi, summarise, uptime, wrapText } from './register'
 
 const empty: Dev = { status: 'running', procs: [], feed: [], notes: [] }
 const started = applyEvent(empty, { type: 'start', label: 'server', command: 'php artisan serve', pid: 10, time: '2026-10-03T16:00:00.000Z' })
@@ -256,16 +256,16 @@ test('clearing the log empties every log and error count but keeps the process r
 })
 
 test('reads APP_URL from .env, skipping commented lines and trailing comments', () => {
-  const text = '#APP_URL=http://localhost:8000\nAPP_URL=https://voice-isolator.test # valet\nAPP_NAME=x'
+  const text = '#APP_URL=http://localhost:8000\nAPP_URL=https://acme.test # valet\nAPP_NAME=x'
 
-  expect(parseEnvValue(text, 'APP_URL')).toBe('https://voice-isolator.test')
+  expect(parseEnvValue(text, 'APP_URL')).toBe('https://acme.test')
   expect(parseEnvValue('APP_URL="http://app.test"', 'APP_URL')).toBe('http://app.test')
   expect(parseEnvValue('APP_NAME=x', 'APP_URL')).toBeNull()
   expect(parseEnvValue('APP_URL=', 'APP_URL')).toBe('')
 })
 
 test('open site uses APP_URL, but a local address gets the real server port', () => {
-  expect(siteUrl('https://voice-isolator.test', 8111)).toBe('https://voice-isolator.test')
+  expect(siteUrl('https://acme.test', 8111)).toBe('https://acme.test')
   expect(siteUrl('http://localhost', 8111)).toBe('http://localhost:8111')
   expect(siteUrl('http://localhost:8000/app', 8111)).toBe('http://localhost:8111/app')
   expect(siteUrl('http://127.0.0.1', null)).toBe('http://127.0.0.1')
@@ -304,19 +304,19 @@ test('matches a process by name, case-insensitively, or by its number', () => {
 
 test('status text summarises every process', () => {
   const two = applyEvent(started, { type: 'start', label: 'queue', command: 'q', time: '2026-10-03T16:00:00.000Z' })
-  const text = statusText('voice-isolator', two, 8111, 'https://voice-isolator.test', Date.parse('2026-10-03T16:02:00.000Z'))
+  const text = statusText('acme', two, 8111, 'https://acme.test', Date.parse('2026-10-03T16:02:00.000Z'))
 
-  expect(text.split('\n')[0]).toBe('voice-isolator dev — running · 2/2 up · :8111')
-  expect(text).toContain('https://voice-isolator.test')
+  expect(text.split('\n')[0]).toBe('acme dev — running · 2/2 up · :8111')
+  expect(text).toContain('https://acme.test')
   expect(text).toContain('● queue')
-  expect(statusText('voice-isolator', empty, null, 'u', 0)).toBe('Dev servers are not running.')
+  expect(statusText('acme', empty, null, 'u', 0)).toBe('Dev servers are not running.')
 })
 
 test('finds the tunnel URL in the real cloudflared and app output, and skips the stale one', () => {
   const box = '2026-10-03T16:17:20Z INF |  https://screenshots-watch-ind-throughout.trycloudflare.com                                |'
   const app = ' INFO TUNNEL_URL updated to: https://screenshots-watch-ind-throughout.trycloudflare.com. '
   const stale = '2026-10-03T16:17:20Z INF Environmental variables map[TUNNEL_URL:https://height-grocery-southern-girls.trycloudflare.com]'
-  const local = ' INFO Tunnelling https://voice-isolator.test (host: voice-isolator.test). '
+  const local = ' INFO Tunnelling https://acme.test (host: acme.test). '
 
   expect(findTunnelUrl(box)).toBe('https://screenshots-watch-ind-throughout.trycloudflare.com')
   expect(findTunnelUrl(app)).toBe('https://screenshots-watch-ind-throughout.trycloudflare.com')
@@ -378,7 +378,10 @@ test('parses the errors, copy and tunnel subcommands', () => {
   expect(parseDevArgs('tunnel')).toEqual({ action: 'tunnel' })
   expect(parseDevArgs('copy vite')).toEqual({ action: 'copy', target: 'vite' })
   expect(parseDevArgs('copy a b').error).toContain('Unknown argument "b"')
-  expect(parseDevArgs('tunnel queue').error).toContain('Unknown argument')
+  expect(parseDevArgs('tunnel open')).toEqual({ action: 'tunnel', target: 'open' })
+  expect(parseDevArgs('tunnel close')).toEqual({ action: 'tunnel', target: 'close' })
+  expect(parseDevArgs('tunnel queue').error).toContain('Unknown tunnel action "queue"')
+  expect(parseDevArgs('tunnel open now').error).toContain('Unknown argument "now"')
 })
 
 test('a port belongs to every process, so it cannot be combined with restarting one', () => {
@@ -444,8 +447,8 @@ test('an ANSI entry is laid out on its visible text, not its escape codes', () =
 })
 
 test('names the host of a site that is not loopback', () => {
-  expect(siteHost('https://kandu-purring-crafting.test')).toBe('kandu-purring-crafting.test')
-  expect(siteHost('https://kandu.test:8443/app')).toBe('kandu.test')
+  expect(siteHost('https://acme-blue-heron.test')).toBe('acme-blue-heron.test')
+  expect(siteHost('https://acme.test:8443/app')).toBe('acme.test')
   expect(siteHost('http://localhost:8000')).toBeNull()
   expect(siteHost('http://127.0.0.1')).toBeNull()
   expect(siteHost('http://0.0.0.0:8000')).toBeNull()
@@ -455,11 +458,11 @@ test('names the host of a site that is not loopback', () => {
 
 
 test('a branch switch or a worktree appearing counts as a change, the first read does not', () => {
-  const porcelain = 'worktree /a/kandu\nHEAD abc\nbranch refs/heads/main\n'
+  const porcelain = 'worktree /a/acme\nHEAD abc\nbranch refs/heads/main\n'
   const main = parseLayout('main\n', '', porcelain)
-  const added = parseLayout('main\n', '', `${porcelain}\nworktree /a/kandu/.claude/worktrees/x\nHEAD abc\n`)
+  const added = parseLayout('main\n', '', `${porcelain}\nworktree /a/acme/.claude/worktrees/x\nHEAD abc\n`)
 
-  expect(main).toEqual({ branch: 'main', worktrees: ['/a/kandu'] })
+  expect(main).toEqual({ branch: 'main', worktrees: ['/a/acme'] })
   expect(layoutChange(null, main)).toBeNull()
   expect(layoutChange(main, main)).toBeNull()
   expect(layoutChange(main, parseLayout('', 'abc123\n', porcelain))).toBe('Branch changed to abc123')
@@ -482,7 +485,7 @@ test('only a severity marker where the tool puts one counts as an error', () => 
   expect(hasError('[previous exception] [object] (PDOException(code: 42P01): SQLSTATE[42P01]: Undefined table')).toBe(false)
   expect(hasError('                      ^ (Connection: pgsql, SQL: select * from "cache")')).toBe(false)
   expect(hasError('Error handling is configured for the failed jobs table')).toBe(false)
-  expect(hasError('[2026-10-04 14:21:39] local.DEBUG: [vite] connected. {"url":"https://kandu.test/login"}')).toBe(false)
+  expect(hasError('[2026-10-04 14:21:39] local.DEBUG: [vite] connected. {"url":"https://acme.test/login"}')).toBe(false)
   expect(hasError('it_handles_failed_jobs ✓')).toBe(false)
 })
 
@@ -494,4 +497,126 @@ test('runs from the session checkout once it is provisioned, else stays put', ()
   expect(pickDir({ ...dirs, ready: false, current: '' })).toBe('/app')
   expect(pickDir({ ...dirs, ready: false, current: '', main: '' })).toBe('/app/.claude/worktrees/wt')
   expect(pickDir({ ...dirs, pinned: '/elsewhere' })).toBe('/elsewhere')
+})
+
+const TUNNEL = 'https://rare-otter-gate.trycloudflare.com'
+const HOST = 'rare-otter-gate.trycloudflare.com'
+
+test('sorts each link that points away from the tunnel by why it does', () => {
+  const html = [
+    '<link rel="stylesheet" href="https://acme.test/build/assets/app.css">',
+    '<script type="module" src="https://acme.test:5173/@vite/client"></script>',
+    '<a href="http://rare-otter-gate.trycloudflare.com/guides">Guides</a>',
+    '<a href="http://localhost:8000/auth">Sign in</a>',
+    '<form action="https://acme-blue-heron.test/logout"></form>',
+    '<a href="https://rare-otter-gate.trycloudflare.com/ok">ok</a>',
+    '<a href="/relative">rel</a>',
+    '<script src="https://cdn.jsdelivr.net/npm/alpinejs"></script>',
+  ].join('\n')
+
+  expect(findLeftovers(html, HOST)).toEqual([
+    { kind: 'local-host', url: 'https://acme.test/build/assets/app.css' },
+    { kind: 'vite', url: 'https://acme.test:5173/@vite/client' },
+    { kind: 'plain-http', url: 'http://rare-otter-gate.trycloudflare.com/guides' },
+    { kind: 'local-host', url: 'http://localhost:8000/auth' },
+    { kind: 'local-host', url: 'https://acme-blue-heron.test/logout' },
+  ])
+})
+
+test('canonical and alternate links name the real site, so they never count', () => {
+  const html = [
+    '<link rel="canonical" href="https://acme.test/" />',
+    '<link rel="alternate" hreflang="en" href="https://acme.test/en">',
+    '<link href="https://acme.test/build/app.css" rel="stylesheet">',
+  ].join('\n')
+
+  expect(findLeftovers(html, HOST)).toEqual([{ kind: 'local-host', url: 'https://acme.test/build/app.css' }])
+})
+
+test('a host that only contains .test is not a local host', () => {
+  expect(findLeftovers('<a href="https://contest.example.com/a">a</a><a href="https://my.testing.io">b</a>', HOST)).toEqual([])
+})
+
+test('the assets to load are the tunnel-hosted CSS and JS, once each', () => {
+  const html = [
+    '<link href="/build/assets/app-1.css" rel="stylesheet">',
+    '<script src="/build/assets/app-2.js?v=3"></script>',
+    '<script src="/build/assets/app-2.js?v=3"></script>',
+    '<script src="https://rare-otter-gate.trycloudflare.com/livewire/livewire.min.js"></script>',
+    '<script src="https://cdn.example.com/lib.js"></script>',
+    '<link href="/favicon.ico" rel="icon">',
+  ].join('\n')
+
+  expect(assetUrls(html, TUNNEL)).toEqual([
+    `${TUNNEL}/build/assets/app-1.css`,
+    `${TUNNEL}/build/assets/app-2.js?v=3`,
+    `${TUNNEL}/livewire/livewire.min.js`,
+  ])
+})
+
+const shared = (overrides: Partial<Share>): Share => ({ state: 'open', dir: '/app', port: 8100, url: TUNNEL, leftovers: [], note: null, ...overrides })
+
+test('the report names one fix for each kind of leftover, and still gives the URL', () => {
+  const report = shareReport(shared({
+    state: 'broken',
+    leftovers: [
+      { kind: 'local-host', url: 'https://acme.test/a.css' },
+      { kind: 'local-host', url: 'https://acme.test/b.js' },
+      { kind: 'vite', url: 'https://acme.test:5173/@vite/client' },
+    ],
+  }))
+
+  expect(report).toContain(`Tunnel: ${TUNNEL}`)
+  expect(report).toContain('3 links point away from the tunnel')
+  expect(report).toContain('https://acme.test/a.css (+1)')
+  expect(report).toContain('URL::useOrigin')
+  expect(report).toContain('Stop Vite')
+  expect(shareReport(shared({ state: 'broken', note: 'The page answered 500 through the tunnel.' }))).toContain('answered 500')
+  expect(shareReport(shared({}))).toBe(`Tunnel: ${TUNNEL} (links checked)\nA new tunnel can take about 20 seconds to resolve for the first visit.`)
+  expect(shareReport(shared({ state: 'failed', url: null, note: 'cloudflared is not installed' }))).toBe('Tunnel failed: cloudflared is not installed')
+  expect(shareReport(shared({ state: 'starting', url: null, note: 'building assets' }))).toBe('Tunnel is starting… (building assets)')
+})
+
+test('the band shows the tunnel state in its colour', () => {
+  expect(shareBand(shared({}))).toEqual({ text: ' · ⇄ tunnel ok', color: 'green' })
+  expect(shareBand(shared({ state: 'broken', leftovers: [{ kind: 'vite', url: 'x' }] }))).toEqual({ text: ' · ⇄ tunnel: 1 link points away', color: 'yellow' })
+  expect(shareBand(shared({ state: 'starting', note: 'building assets' })).text).toBe(' · ⇄ tunnel: building assets…')
+  expect(shareBand(shared({ state: 'failed' })).color).toBe('red')
+})
+
+test('the Vite process is found by its command', () => {
+  expect(isViteCommand('bun run dev')).toBe(true)
+  expect(isViteCommand('npm run dev')).toBe(true)
+  expect(isViteCommand('npx vite')).toBe(true)
+  expect(isViteCommand('php artisan serve')).toBe(false)
+  expect(isViteCommand('php artisan queue:listen')).toBe(false)
+  expect(isViteCommand('npm run devtools')).toBe(false)
+})
+
+test('the build runs with the lockfile package manager, and only when a build script exists', () => {
+  const withBuild = JSON.stringify({ scripts: { build: 'vite build', dev: 'vite' } })
+
+  expect(buildArgv(withBuild, ['bun.lock'])).toEqual(['bun', 'run', 'build'])
+  expect(buildArgv(withBuild, ['pnpm-lock.yaml'])).toEqual(['pnpm', 'run', 'build'])
+  expect(buildArgv(withBuild, [])).toEqual(['npm', 'run', 'build'])
+  expect(buildArgv(JSON.stringify({ scripts: { dev: 'vite' } }), ['bun.lock'])).toBeNull()
+  expect(buildArgv('not json', ['bun.lock'])).toBeNull()
+})
+
+test('a redirect is followed only while it stays on the tunnel or the local serve', () => {
+  const hosts = [HOST, '127.0.0.1:8100']
+
+  expect(localPath('/login', hosts)).toBe('/login')
+  expect(localPath(`${TUNNEL}/login?next=%2F`, hosts)).toBe('/login?next=%2F')
+  expect(localPath(`http://${HOST}`, hosts)).toBe('/')
+  expect(localPath('http://127.0.0.1:8100/auth', hosts)).toBe('/auth')
+  expect(localPath('https://accounts.example.com/oauth', hosts)).toBeNull()
+  expect(localPath('//elsewhere.example/x', hosts)).toBeNull()
+  expect(localPath('login', hosts)).toBeNull()
+})
+
+test('reads the status and redirect that curl writes after the body', () => {
+  expect(readCurl('<html></html>\n__artisan_dev_status__:200 ')).toEqual({ status: 200, text: '<html></html>', location: '' })
+  expect(readCurl(`\n__artisan_dev_status__:302 ${TUNNEL}/login`)).toEqual({ status: 302, text: '', location: `${TUNNEL}/login` })
+  expect(readCurl('curl: (7) Failed to connect')).toBeNull()
 })

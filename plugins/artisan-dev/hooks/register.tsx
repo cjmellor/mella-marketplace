@@ -1,7 +1,7 @@
 import type { EngineInterface, Register, RenderChildren } from 'claude-code'
 import { atom, read, update } from 'claude-code'
 
-import type { Dev, DevEvent, Entry, Layout, Proc } from '../types'
+import type { Dev, DevEvent, Entry, Layout, Leftover, LeftoverKind, Proc, Share } from '../types'
 
 const DEFAULT_PORT = 8000
 const PANE = 'dev'
@@ -55,6 +55,7 @@ const detected = atom({ plugin: 'artisan-dev', key: 'detected' } as const, null)
 const scrollBack = atom({ plugin: 'artisan-dev', key: 'back' } as const, 0)
 const onlyErrors = atom({ plugin: 'artisan-dev', key: 'onlyErrors' } as const, false)
 const tunnel = atom({ plugin: 'artisan-dev', key: 'tunnel' } as const, null)
+const share = atom({ plugin: 'artisan-dev', key: 'share' } as const, null)
 const attached = atom({ plugin: 'artisan-dev', key: 'attached' } as const, null)
 const layout = atom({ plugin: 'artisan-dev', key: 'layout' } as const, null)
 
@@ -153,12 +154,15 @@ export const DEV_HELP = [
   '/dev clear             clear the log',
   '/dev errors            toggle showing only errors and warnings in the log',
   '/dev copy [name]       copy a process log (or the all view) to the clipboard',
-  '/dev tunnel            show and copy the public tunnel URL, if one was printed',
+  '/dev tunnel            show and copy the public tunnel URL',
+  '/dev tunnel open       open a checked tunnel to this checkout (again: check its links again)',
+  '/dev tunnel close      close that tunnel and start Vite again',
   'Add --port=8111, -p 8111 or port=8111 to start or restart on another port (port=default resets).',
 ].join('\n')
 
 const PORT_ACTIONS: DevAction[] = ['open', 'start', 'restart']
-const TARGET_ACTIONS: DevAction[] = ['restart', 'ask', 'copy']
+const TARGET_ACTIONS: DevAction[] = ['restart', 'ask', 'copy', 'tunnel']
+const TUNNEL_VERBS = ['open', 'close']
 
 export const parseDevArgs = (args: string): DevArgs => {
   const tokens = args.trim().split(/\s+/).filter(Boolean)
@@ -197,6 +201,10 @@ export const parseDevArgs = (args: string): DevArgs => {
 
       result.port = port
     }
+  }
+
+  if (result.action === 'tunnel' && result.target !== undefined && !TUNNEL_VERBS.includes(result.target.toLowerCase())) {
+    return { action: result.action, error: `Unknown tunnel action "${result.target}". Use /dev tunnel, /dev tunnel open or /dev tunnel close.` }
   }
 
   if (result.action === 'restart' && result.target !== undefined && result.port !== undefined) {
@@ -349,6 +357,132 @@ export const findTunnelUrl = (raw: string, extraHosts: string[] = []): string | 
   }
 
   return null
+}
+
+export const hostOf = (url: string): string => (url.replace(/^https?:\/\//i, '').split(/[/:?#]/)[0] ?? '').toLowerCase()
+
+const LINK_ATTRIBUTE = /\b(?:href|src|action)\s*=\s*["']([^"']+)["']/gi
+const LOCAL_HOST = /^(?:https?:)?\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|[^/:?#]+\.(?:test|localhost))(?=[/:?#]|$)/i
+const DEV_SERVER_PORT = /^(?:https?:)?\/\/[^/?#]+:5173(?=[/?#]|$)/i
+const ASSET_PATH = /\.(?:css|js|mjs)(?:[?#]|$)/i
+const MAX_LEFTOVERS = 50
+
+const HTML_TAG = /<[a-z][^>]*>/gi
+const SITE_IDENTITY_LINK = /^<link\b[^>]*\brel\s*=\s*["'][^"']*\b(?:canonical|alternate)\b/i
+
+const pageLinks = (html: string): string[] =>
+  [...html.matchAll(HTML_TAG)]
+    .map(match => match[0])
+    .filter(tag => !SITE_IDENTITY_LINK.test(tag))
+    .flatMap(tag => [...tag.matchAll(LINK_ATTRIBUTE)].map(match => (match[1] ?? '').replaceAll('&amp;', '&').trim()))
+
+export const findLeftovers = (html: string, tunnelHost: string): Leftover[] =>
+  pageLinks(html)
+    .flatMap((url): Leftover[] => {
+      if (DEV_SERVER_PORT.test(url)) {
+        return [{ kind: 'vite', url }]
+      }
+
+      if (LOCAL_HOST.test(url)) {
+        return [{ kind: 'local-host', url }]
+      }
+
+      return hostOf(url) === tunnelHost && /^http:\/\//i.test(url) ? [{ kind: 'plain-http', url }] : []
+    })
+    .slice(0, MAX_LEFTOVERS)
+
+export const assetUrls = (html: string, tunnelUrl: string): string[] => {
+  const origin = tunnelUrl.replace(/\/+$/, '')
+  const host = hostOf(tunnelUrl)
+  const urls = pageLinks(html)
+    .filter(url => ASSET_PATH.test(url))
+    .map(url => (url.startsWith('/') && !url.startsWith('//') ? `${origin}${url}` : url))
+    .filter(url => /^https:\/\//i.test(url) && hostOf(url) === host)
+
+  return [...new Set(urls)]
+}
+
+export const LEFTOVER_FIXES: Record<LeftoverKind, string> = {
+  'local-host': 'The app builds links from APP_URL. Let web requests use their own host (look for URL::useOrigin or URL::forceRootUrl).',
+  'plain-http': "The app thinks the request is http. Add URL::forceScheme('https') in AppServiceProvider.",
+  vite: 'A Vite dev server is writing public/hot. Stop Vite in this checkout.',
+  broken: 'These assets do not load through the tunnel.',
+}
+
+const FIRST_VISIT = 'A new tunnel can take about 20 seconds to resolve for the first visit.'
+
+export const shareReport = (current: Share): string => {
+  if (current.state === 'failed') {
+    return `Tunnel failed: ${current.note ?? 'unknown error'}`
+  }
+
+  if (current.state === 'starting' || current.state === 'checking') {
+    return `Tunnel is ${current.state === 'starting' ? 'starting' : 'checking its links'}…${current.note ? ` (${current.note})` : ''}`
+  }
+
+  if (current.state === 'open') {
+    return `Tunnel: ${current.url} (links checked)\n${FIRST_VISIT}`
+  }
+
+  const kinds = [...new Set(current.leftovers.map(leftover => leftover.kind))]
+  const groups = kinds.map(kind => {
+    const urls = current.leftovers.filter(leftover => leftover.kind === kind).map(leftover => leftover.url)
+    const more = urls.length > 1 ? ` (+${urls.length - 1})` : ''
+
+    return `  ✗ ${urls[0]}${more}\n    ${LEFTOVER_FIXES[kind]}`
+  })
+  const count = current.leftovers.length
+  const summary = count > 0 ? `${count} ${count === 1 ? 'link points' : 'links point'} away from the tunnel:` : (current.note ?? 'The page did not load.')
+
+  return [`Tunnel: ${current.url}`, summary, ...groups, 'Fix the app, then /dev tunnel open checks again.'].join('\n')
+}
+
+export const shareBand = (current: Share): { text: string; color: string } => {
+  if (current.state === 'open') {
+    return { text: ' · ⇄ tunnel ok', color: 'green' }
+  }
+
+  if (current.state === 'failed') {
+    return { text: ' · ⇄ tunnel failed', color: 'red' }
+  }
+
+  if (current.state === 'broken') {
+    const count = current.leftovers.length
+
+    return { text: count > 0 ? ` · ⇄ tunnel: ${count} ${count === 1 ? 'link points' : 'links point'} away` : ' · ⇄ tunnel: page did not load', color: 'yellow' }
+  }
+
+  return { text: ` · ⇄ tunnel: ${current.state === 'checking' ? 'checking links' : (current.note ?? 'starting')}…`, color: 'yellow' }
+}
+
+export const isViteCommand =(command: string): boolean => /\bvite\b|\brun\s+dev\b/.test(command)
+
+const BUILD_RUNNERS: [string, string][] = [
+  ['bun.lock', 'bun'],
+  ['bun.lockb', 'bun'],
+  ['pnpm-lock.yaml', 'pnpm'],
+  ['yarn.lock', 'yarn'],
+  ['package-lock.json', 'npm'],
+]
+
+export const BUILD_LOCKS = BUILD_RUNNERS.map(([lock]) => lock)
+
+export const buildArgv = (packageJson: string, locks: string[]): string[] | null => {
+  let scripts: Record<string, unknown> = {}
+
+  try {
+    scripts = (JSON.parse(packageJson) as { scripts?: Record<string, unknown> }).scripts ?? {}
+  } catch {
+    return null
+  }
+
+  if (typeof scripts.build !== 'string') {
+    return null
+  }
+
+  const runner = BUILD_RUNNERS.find(([lock]) => locks.includes(lock))?.[1] ?? 'npm'
+
+  return [runner, 'run', 'build']
 }
 
 export const effectivePort = (
@@ -760,6 +894,12 @@ let tick: { cancel: () => void } | null = null
 let watching = false
 let view = { columns: 80, labelWidth: 6 }
 
+type ShareProc = { label: string; run: Child; pgid: number | null; stopping: boolean; tail: string[]; done: Promise<void> }
+
+let shareProcs: ShareProc[] = []
+let shareTurn = 0
+let isViteHeld = false
+
 const newRunner = (spec: ProcSpec): Runner => ({
   ...spec,
   run: null,
@@ -880,6 +1020,11 @@ async function followCheckout($: EngineInterface): Promise<boolean> {
   }
 
   const moved = project.dir !== ''
+
+  if (moved && (await closeTunnel($, false))) {
+    $.ui.toast('Tunnel closed — the session left its checkout', { timeoutMs: 6000 })
+  }
+
   project = { dir, name: dir.split('/').filter(Boolean).pop() ?? dir }
   await update($, layout, () => null)
 
@@ -1104,7 +1249,7 @@ async function pump($: EngineInterface, runner: Runner, run: Child, startedAt: n
 }
 
 async function startRunner($: EngineInterface, runner: Runner): Promise<boolean> {
-  if (isActive(runner)) {
+  if (isActive(runner) || (isViteHeld && isViteCommand(runner.command))) {
     return false
   }
 
@@ -1178,15 +1323,25 @@ async function stopRunner($: EngineInterface, runner: Runner, graceMs = TERM_GRA
 }
 
 async function releaseAll($: EngineInterface, graceMs: number) {
-  await Promise.all(
-    [...runners.values()].map(runner => {
+  shareTurn++
+
+  const leaving = shareProcs
+
+  shareProcs = []
+  await Promise.all([
+    ...[...runners.values()].map(runner => {
       runner.stopping = true
       runner.timer?.cancel()
       runner.timer = null
 
       return runner.pgid ? killGroup($, runner.pgid, graceMs) : runner.run?.return({ code: null, signal: 'SIGTERM' })
     }),
-  )
+    ...leaving.map(proc => {
+      proc.stopping = true
+
+      return proc.pgid ? killGroup($, proc.pgid, graceMs) : proc.run.return({ code: null, signal: 'SIGTERM' })
+    }),
+  ])
 }
 
 async function syncRunners($: EngineInterface): Promise<boolean> {
@@ -1348,16 +1503,447 @@ async function copyLog($: EngineInterface, surface: CopySurface | undefined, for
   return copyText($, logText(entries, pick === ALL), surface, done)
 }
 
-async function copyTunnel($: EngineInterface, surface: CopySurface | undefined): Promise<string | null> {
-  const found = await read($, tunnel)
+const SERVE_WAIT_MS = 20_000
+const SHARE_PORTS = { first: 8100, count: 50 }
+const TUNNEL_WAIT_MS = 45_000
+const BUILD_TIMEOUT_MS = 300_000
+const MAX_ASSETS = 10
+const MAX_HOPS = 5
+const CURL_STATUS = '__artisan_dev_status__:'
+const TUNNEL_REGISTERED = /Registered tunnel connection/i
 
-  if (!found) {
-    $.ui.toast('No tunnel URL yet — it appears once the tunnel prints one', { timeoutMs: 6000 })
+function deferred<T>() {
+  let resolve: (value: T | null) => void = () => {}
+  const promise = new Promise<T | null>(done => {
+    resolve = done
+  })
+
+  return { promise, resolve }
+}
+
+function within<T>($: EngineInterface, promise: Promise<T | null>, ms: number): Promise<T | null> {
+  return new Promise(resolve => {
+    const timer = $.clock.after(ms, () => resolve(null))
+
+    void promise.then(value => {
+      timer.cancel()
+      resolve(value)
+    })
+  })
+}
+
+function spawnShare(
+  $: EngineInterface,
+  label: string,
+  command: string,
+  cwd: string,
+  onLine: (line: string) => void,
+  onExit: (proc: ShareProc) => void,
+): ShareProc {
+  const run = $.process.spawn({ argv: spawnArgv(command), cwd })
+  const proc: ShareProc = { label, run, pgid: null, stopping: false, tail: [], done: Promise.resolve() }
+
+  proc.done = (async () => {
+    let rest = ''
+
+    try {
+      for await (const { text } of run) {
+        const split = splitLines(rest, text)
+
+        rest = split.rest.slice(-MAX_LINE)
+
+        for (const raw of split.lines) {
+          const line = stripAnsi(afterCarriage(raw)).trim()
+          const pgid = proc.pgid === null && line.startsWith(PGID_MARK) ? Number(line.slice(PGID_MARK.length)) : NaN
+
+          if (Number.isInteger(pgid) && pgid > 1) {
+            proc.pgid = pgid
+          } else if (line) {
+            proc.tail = [...proc.tail, line].slice(-5)
+            onLine(line)
+          }
+        }
+      }
+    } catch (error) {
+      proc.tail = [...proc.tail, String(error)].slice(-5)
+    }
+
+    if (!proc.stopping) {
+      onExit(proc)
+    }
+  })()
+
+  return proc
+}
+
+async function freePort($: EngineInterface): Promise<number | null> {
+  for (let port = SHARE_PORTS.first; port < SHARE_PORTS.first + SHARE_PORTS.count; port++) {
+    const listening = await $.process.run(['lsof', '-nP', `-iTCP:${port}`, '-sTCP:LISTEN']).catch(() => null)
+
+    if (listening && listening.exitCode !== 0) {
+      return port
+    }
+  }
+
+  return null
+}
+
+async function stopShareProcs($: EngineInterface) {
+  const leaving = shareProcs
+
+  shareProcs = []
+  await Promise.all(
+    leaving.map(async proc => {
+      proc.stopping = true
+
+      for (let waited = 0; proc.pgid === null && waited < 1000; waited += 50) {
+        await $.clock.sleep(50)
+      }
+
+      if (proc.pgid) {
+        await killGroup($, proc.pgid)
+      } else {
+        void proc.run.return({ code: null, signal: 'SIGTERM' })
+      }
+
+      await proc.done
+    }),
+  )
+}
+
+async function holdVite($: EngineInterface) {
+  isViteHeld = true
+  await Promise.all(
+    [...runners.values()].filter(runner => isViteCommand(runner.command) && isActive(runner)).map(runner => stopRunner($, runner)),
+  )
+}
+
+async function releaseVite($: EngineInterface, restart: boolean) {
+  if (!isViteHeld) {
+    return
+  }
+
+  isViteHeld = false
+
+  if (!restart || (await read($, dev)).status !== 'running') {
+    return
+  }
+
+  await Promise.all([...runners.values()].filter(runner => isViteCommand(runner.command)).map(runner => startRunner($, runner)))
+}
+
+async function buildAssets($: EngineInterface, dir: string): Promise<string | null> {
+  const packageJson = await $.fs.read(`${dir}/package.json`).catch(() => null)
+
+  if (packageJson === null) {
+    return null
+  }
+
+  const locks: string[] = []
+
+  for (const lock of BUILD_LOCKS) {
+    if (await $.fs.exists(`${dir}/${lock}`).catch(() => false)) {
+      locks.push(lock)
+    }
+  }
+
+  const argv = buildArgv(String(packageJson), locks)
+
+  if (!argv) {
+    return null
+  }
+
+  try {
+    const built = await $.process.run(argv, { cwd: dir, timeoutMs: BUILD_TIMEOUT_MS })
+
+    if (built.exitCode === 0) {
+      return null
+    }
+
+    const last = stripAnsi(`${built.stdout}\n${built.stderr}`).split('\n').map(line => line.trim()).filter(Boolean).pop()
+
+    return `${argv.join(' ')} failed${last ? `: ${last.slice(0, 120)}` : ''}`
+  } catch (error) {
+    return `${argv.join(' ')} failed: ${String(error)}`
+  }
+}
+
+export const localPath = (location: string, hosts: string[]): string | null => {
+  if (location.startsWith('/') && !location.startsWith('//')) {
+    return location
+  }
+
+  const absolute = location.match(/^https?:\/\/([^/?#]+)(.*)$/i)
+
+  return absolute && hosts.includes((absolute[1] ?? '').toLowerCase()) ? absolute[2] || '/' : null
+}
+
+export const readCurl = (stdout: string): { status: number; text: string; location: string } | null => {
+  const at = stdout.lastIndexOf(`\n${CURL_STATUS}`)
+  const [code = '', location = ''] = at < 0 ? [] : stdout.slice(at + CURL_STATUS.length + 1).trim().split(' ')
+  const status = Number(code)
+
+  return Number.isInteger(status) && status > 0 ? { status, text: stdout.slice(0, at), location } : null
+}
+
+async function askServe($: EngineInterface, port: number, tunnelHost: string, path: string): Promise<{ status: number; text: string } | null> {
+  const hosts = [tunnelHost, `127.0.0.1:${port}`]
+  let target = path
+
+  for (let hop = 0; hop < MAX_HOPS; hop++) {
+    const result = await $.process
+      .run(
+        [
+          'curl', '-sS', '--max-time', '15',
+          '-H', `Host: ${tunnelHost}`,
+          '-H', 'X-Forwarded-Proto: https',
+          '-w', `\n${CURL_STATUS}%{http_code} %{redirect_url}`,
+          `http://127.0.0.1:${port}${target}`,
+        ],
+        { timeoutMs: 20_000 },
+      )
+      .catch(() => null)
+    const page = result ? readCurl(result.stdout) : null
+    const next = page && page.status >= 300 && page.status < 400 ? localPath(page.location, hosts) : null
+
+    if (!page || !next) {
+      return page && { status: page.status, text: page.text }
+    }
+
+    target = next
+  }
+
+  return null
+}
+
+async function checkShare($: EngineInterface): Promise<Share | null> {
+  const current = await read($, share)
+
+  if (!current?.url || current.port === null) {
+    return current
+  }
+
+  const turn = shareTurn
+  const { url, port } = current
+  const host = hostOf(url)
+
+  await update($, share, (): Share => ({ ...current, state: 'checking', leftovers: [], note: null }))
+
+  const page = await askServe($, port, host, '/')
+  const loaded = page !== null && page.status < 400
+  const leftovers = loaded ? findLeftovers(page.text, host) : []
+
+  for (const asset of loaded ? assetUrls(page.text, url).slice(0, MAX_ASSETS) : []) {
+    if (turn !== shareTurn) {
+      break
+    }
+
+    const path = localPath(asset, [host])
+
+    if (path && (await askServe($, port, host, path))?.status !== 200) {
+      leftovers.push({ kind: 'broken', url: asset })
+    }
+  }
+
+  if (turn !== shareTurn) {
+    return null
+  }
+
+  const note = page === null ? 'php artisan serve did not answer.' : loaded ? null : `The page answered ${page.status}.`
+  const checked: Share = { ...current, state: leftovers.length > 0 || note ? 'broken' : 'open', leftovers, note }
+
+  await update($, share, () => checked)
+
+  return checked
+}
+
+async function failShare($: EngineInterface, turn: number, note: string): Promise<Share | null> {
+  if (turn !== shareTurn) {
+    return null
+  }
+
+  shareTurn++
+  await stopShareProcs($)
+  await releaseVite($, true)
+
+  const failed: Share = { state: 'failed', dir: (await read($, share))?.dir ?? project.dir, port: null, url: null, leftovers: [], note }
+
+  await update($, share, () => failed)
+
+  return failed
+}
+
+async function startShare($: EngineInterface): Promise<Share | null> {
+  await stopShareProcs($)
+
+  const turn = ++shareTurn
+  const dir = project.dir
+  const starting = (note: string) => update($, share, (): Share => ({ state: 'starting', dir, port: null, url: null, leftovers: [], note }))
+
+  await starting('looking for cloudflared')
+
+  if ((await $.process.run(['which', 'cloudflared']).catch(() => null))?.exitCode !== 0) {
+    return failShare($, turn, 'cloudflared is not installed (brew install cloudflared)')
+  }
+
+  await starting('building assets')
+  await holdVite($)
+
+  const built = await buildAssets($, dir)
+
+  if (built) {
+    return failShare($, turn, built)
+  }
+
+  if (turn !== shareTurn) {
+    return null
+  }
+
+  const port = deferred<number>()
+  const found = deferred<string>()
+  const registered = deferred<boolean>()
+  const onExit = (proc: ShareProc) => {
+    port.resolve(null)
+    found.resolve(null)
+    registered.resolve(null)
+    void failShare($, turn, `${proc.label} stopped${proc.tail.length > 0 ? `: ${proc.tail[proc.tail.length - 1]}` : ''}`)
+  }
+
+  const free = await freePort($)
+
+  if (turn !== shareTurn) {
+    return null
+  }
+
+  if (!free) {
+    return failShare($, turn, `no free port from ${SHARE_PORTS.first} to ${SHARE_PORTS.first + SHARE_PORTS.count - 1}`)
+  }
+
+  await starting('starting php artisan serve')
+  shareProcs.push(
+    spawnShare($, 'serve', `php artisan serve --port=${free}`, dir, line => {
+      const served = line.match(SERVER_LINE)
+
+      if (served) {
+        port.resolve(toPort(served[1] ?? ''))
+      }
+    }, onExit),
+  )
+
+  const served = await within($, port.promise, SERVE_WAIT_MS)
+
+  if (turn !== shareTurn) {
+    return null
+  }
+
+  if (!served) {
+    return failShare($, turn, 'php artisan serve did not report a port')
+  }
+
+  await starting('starting cloudflared')
+  shareProcs.push(
+    spawnShare($, 'tunnel', `cloudflared tunnel --url http://127.0.0.1:${served}`, dir, line => {
+      const url = findTunnelUrl(line)
+
+      if (url) {
+        found.resolve(url)
+      }
+
+      if (TUNNEL_REGISTERED.test(line)) {
+        registered.resolve(true)
+      }
+    }, onExit),
+  )
+
+  const url = await within($, found.promise, TUNNEL_WAIT_MS)
+
+  if (turn !== shareTurn) {
+    return null
+  }
+
+  if (!url) {
+    return failShare($, turn, 'cloudflared printed no tunnel URL')
+  }
+
+  const isRegistered = await within($, registered.promise, TUNNEL_WAIT_MS)
+
+  if (turn !== shareTurn) {
+    return null
+  }
+
+  if (!isRegistered) {
+    return failShare($, turn, 'cloudflared did not register a connection')
+  }
+
+  await update($, share, (): Share => ({ state: 'checking', dir, port: served, url, leftovers: [], note: null }))
+
+  return checkShare($)
+}
+
+function announceShare($: EngineInterface, result: Share | null) {
+  if (result?.state === 'open') {
+    $.ui.toast(`Tunnel ready: ${result.url} — press u to copy. ${FIRST_VISIT}`, { timeoutMs: 10_000 })
+  } else if (result?.state === 'broken') {
+    const count = result.leftovers.length
+    const why = count > 0 ? `${count} ${count === 1 ? 'link points' : 'links point'} away from it` : (result.note ?? 'it did not load')
+
+    $.ui.toast(`Tunnel opened, but ${why} — /dev tunnel shows why`, { timeoutMs: 10_000 })
+  } else if (result?.state === 'failed') {
+    $.ui.toast(`Tunnel failed: ${result.note}`, { timeoutMs: 10_000 })
+  }
+}
+
+async function openTunnel($: EngineInterface): Promise<string> {
+  const current = await read($, share)
+
+  if (current?.state === 'starting' || current?.state === 'checking') {
+    return shareReport(current)
+  }
+
+  const isRecheck = current?.state === 'open' || current?.state === 'broken'
+
+  void (isRecheck ? checkShare($) : startShare($))
+    .then(result => announceShare($, result))
+    .catch(error => addNote($, `tunnel: ${String(error)}`))
+
+  return isRecheck ? 'Checking the tunnel links again…' : 'Opening a tunnel to this checkout… the band shows its progress.'
+}
+
+async function closeTunnel($: EngineInterface, restartVite = true): Promise<boolean> {
+  const had = (await read($, share)) !== null || shareProcs.length > 0
+
+  shareTurn++
+  await stopShareProcs($)
+  await releaseVite($, restartVite)
+  await update($, share, () => null)
+
+  return had
+}
+
+async function copyTunnel($: EngineInterface, surface: CopySurface | undefined): Promise<string | null> {
+  const own = await read($, share)
+
+  if (own?.state === 'open' && own.url) {
+    await copyText($, own.url, surface, `Copied ${own.url}`)
+
+    return own.url
+  }
+
+  if (own && own.state !== 'failed') {
+    $.ui.toast(own.state === 'broken' ? 'The tunnel links point away from it — /dev tunnel shows why' : 'The tunnel is not ready yet', { timeoutMs: 6000 })
 
     return null
   }
 
-  await copyText($, found.url, surface, `Copied ${found.url}`)
+  const found = await read($, tunnel)
+
+  if (!found) {
+    $.ui.toast('No tunnel yet — press n or run /dev tunnel open', { timeoutMs: 6000 })
+
+    return null
+  }
+
+  await copyText($, found.url, surface, `Copied ${found.url} (printed by ${found.label}, links not checked)`)
 
   return found.url
 }
@@ -1401,6 +1987,7 @@ async function carryState($: EngineInterface) {
     appUrl: await read($, appUrl),
     detected: await read($, detected),
     tunnel: await read($, tunnel),
+    share: await read($, share),
     onlyErrors: await read($, onlyErrors),
     layout: await read($, layout),
   }
@@ -1414,6 +2001,7 @@ async function restoreState($: EngineInterface, carried: Awaited<ReturnType<type
   await update($, appUrl, () => carried.appUrl)
   await update($, detected, () => carried.detected)
   await update($, tunnel, () => carried.tunnel)
+  await update($, share, () => carried.share)
   await update($, onlyErrors, () => carried.onlyErrors)
   await update($, layout, () => carried.layout)
   await update($, isOpen, () => false)
@@ -1493,9 +2081,29 @@ async function runDev($: EngineInterface, args: DevArgs): Promise<string> {
   }
 
   if (args.action === 'tunnel') {
+    const verb = args.target?.toLowerCase()
+
+    if (verb === 'open') {
+      return openTunnel($)
+    }
+
+    if (verb === 'close') {
+      return (await closeTunnel($)) ? 'Tunnel closed.' : 'No tunnel is open.'
+    }
+
+    const own = await read($, share)
+
+    if (own && own.state !== 'failed') {
+      return own.state === 'open' && (await copyTunnel($, undefined)) ? `${shareReport(own)} (copied)` : shareReport(own)
+    }
+
     const copied = await copyTunnel($, undefined)
 
-    return copied ? `Tunnel: ${copied} (copied)` : 'No tunnel URL yet.'
+    if (copied) {
+      return `Tunnel: ${copied} (copied — printed by a process, links not checked)`
+    }
+
+    return own ? `${shareReport(own)}\n/dev tunnel open tries again.` : 'No tunnel yet. /dev tunnel open opens one to this checkout.'
   }
 
   const names = current.procs.map(proc => proc.label).join(', ')
@@ -1743,9 +2351,10 @@ export const register: Register = (on, options) => {
     await $.command.register({
       name: 'dev',
       description: `Manage ${project.name} \`php artisan dev\` in a pane`,
-      argumentHint: '[start|stop|restart|status|site|ask|clear|errors|copy|tunnel|help] [--port=8111]',
+      argumentHint: '[start|stop|restart|status|site|ask|clear|errors|copy|tunnel [open|close]|help] [--port=8111]',
     })
     await reapStale($)
+    await closeTunnel($, false)
     await update($, dev, () => emptyDev)
     await update($, isOpen, () => false)
     tick?.cancel()
@@ -1825,10 +2434,13 @@ export const register: Register = (on, options) => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const other = await next(e)
     const current = await read($, dev)
+    const own = await read($, share)
 
-    if (e.props.hasSurvey || (current.status === 'stopped' && current.procs.length === 0)) {
+    if (e.props.hasSurvey || (current.status === 'stopped' && current.procs.length === 0 && !own)) {
       return other
     }
+
+    const tunnelBand = own ? shareBand(own) : null
 
     const { Box, Button, Text } = $.ui.resolve(e)
     const stack = <T extends RenderChildren>(band: T) => (other ? <Box flexDirection="column">{band}{other}</Box> : band)
@@ -1861,6 +2473,7 @@ export const register: Register = (on, options) => {
         ) : null}
         <Text dimColor>{detail}</Text>
         {errors > 0 ? <Text color="red">{errorText}</Text> : null}
+        {tunnelBand ? <Text color={tunnelBand.color}>{tunnelBand.text}</Text> : null}
         <Text>  </Text>
         <Button key="dev-toggle" label={open ? '−' : '+'} plain dimColor onPress={() => togglePane($)} />
       </Box>,
@@ -1912,6 +2525,9 @@ export const register: Register = (on, options) => {
     )
     const isFiltered = await read($, onlyErrors)
     const found = await read($, tunnel)
+    const own = await read($, share)
+    const isOwnLive = own !== null && own.state !== 'failed'
+    const canCopy = isOwnLive ? own.state === 'open' : found !== null
     const isAttached = (await read($, attached)) !== null
     const entries = visibleEntries(current, pick, isFiltered)
     const filterLabel = isFiltered ? 'Errors only ✓' : 'Errors only'
@@ -1925,7 +2541,11 @@ export const register: Register = (on, options) => {
       { key: 'restart', hotkey: 'r', label: 'Restart all', run: () => restartAll($) },
       { key: 'restart-one', hotkey: 't', label: 'Restart one', run: () => restartSelected($) },
       { key: 'site', hotkey: 'o', label: 'Open site', run: () => openUrl($, siteUrl(siteBase, port)) },
-      ...(found ? [{ key: 'copy-tunnel', hotkey: 'u', label: 'Copy tunnel', run: (surface?: CopySurface) => copyTunnel($, surface) }] : []),
+      isOwnLive
+        ? { key: 'tunnel', hotkey: 'n', label: 'Close tunnel', run: () => closeTunnel($) }
+        : { key: 'tunnel', hotkey: 'n', label: 'Open tunnel', run: () => openTunnel($) },
+      ...(own?.state === 'broken' ? [{ key: 'recheck', hotkey: 'k', label: 'Check again', run: () => openTunnel($) }] : []),
+      ...(canCopy ? [{ key: 'copy-tunnel', hotkey: 'u', label: 'Copy tunnel', run: (surface?: CopySurface) => copyTunnel($, surface) }] : []),
       { key: 'copy-log', hotkey: 'c', label: 'Copy log', run: surface => copyLog($, surface) },
       { key: 'ask', hotkey: 'a', label: isAttached ? 'asked ✓' : 'Ask Claude', run: () => toggleAttached($) },
     ]
