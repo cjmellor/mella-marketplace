@@ -523,6 +523,16 @@ test('sorts each link that points away from the tunnel by why it does', () => {
   ])
 })
 
+test('canonical and alternate links name the real site, so they never count', () => {
+  const html = [
+    '<link rel="canonical" href="https://voice-isolator.test/" />',
+    '<link rel="alternate" hreflang="en" href="https://voice-isolator.test/en">',
+    '<link href="https://voice-isolator.test/build/app.css" rel="stylesheet">',
+  ].join('\n')
+
+  expect(findLeftovers(html, HOST)).toEqual([{ kind: 'local-host', url: 'https://voice-isolator.test/build/app.css' }])
+})
+
 test('a host that only contains .test is not a local host', () => {
   expect(findLeftovers('<a href="https://contest.example.com/a">a</a><a href="https://my.testing.io">b</a>', HOST)).toEqual([])
 })

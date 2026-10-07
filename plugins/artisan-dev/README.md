@@ -70,7 +70,7 @@ Reloading the mod or ending the session stops the servers. Anything left over fr
 3. starts its own `php artisan serve` on the first free port from 8100, and `cloudflared tunnel --url` to that port, with no Host rewrite, so the app sees the tunnel's own host;
 4. fetches `/` through the tunnel and loads its CSS and JS.
 
-**Copy tunnel** appears only when no link on the page points away from the tunnel. Otherwise the band says how many do, and `/dev tunnel` lists them with the fix each kind needs in the app:
+**Copy tunnel** appears only when no link on the page points away from the tunnel. Canonical and alternate links name the real site on purpose, so they never count. Otherwise the band says how many do, and `/dev tunnel` lists them with the fix each kind needs in the app:
 
 | Link | Why | Fix in the app |
 |------|-----|----------------|

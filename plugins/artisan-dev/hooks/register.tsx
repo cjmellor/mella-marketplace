@@ -367,8 +367,14 @@ const DEV_SERVER_PORT = /^(?:https?:)?\/\/[^/?#]+:5173(?=[/?#]|$)/i
 const ASSET_PATH = /\.(?:css|js|mjs)(?:[?#]|$)/i
 const MAX_LEFTOVERS = 50
 
+const HTML_TAG = /<[a-z][^>]*>/gi
+const SITE_IDENTITY_LINK = /^<link\b[^>]*\brel\s*=\s*["'][^"']*\b(?:canonical|alternate)\b/i
+
 const pageLinks = (html: string): string[] =>
-  [...html.matchAll(LINK_ATTRIBUTE)].map(match => (match[1] ?? '').replaceAll('&amp;', '&').trim())
+  [...html.matchAll(HTML_TAG)]
+    .map(match => match[0])
+    .filter(tag => !SITE_IDENTITY_LINK.test(tag))
+    .flatMap(tag => [...tag.matchAll(LINK_ATTRIBUTE)].map(match => (match[1] ?? '').replaceAll('&amp;', '&').trim()))
 
 export const findLeftovers = (html: string, tunnelHost: string): Leftover[] =>
   pageLinks(html)
