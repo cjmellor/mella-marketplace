@@ -9,7 +9,7 @@ artisan-dev is a Claude Code mod. `/dev` starts every process `php artisan dev` 
 - A Claude Code build that loads plugin modules (mods).
 - A Laravel app whose Artisan has `dev` and `dev:list`.
 - macOS: processes are launched through `perl` (preinstalled) and the site is opened with `open`.
-- For `/dev tunnel open`: `cloudflared` on the PATH (`brew install cloudflared`).
+- For `/dev tunnel open`: `cloudflared` on the PATH (`brew install cloudflared`), plus `lsof` and `curl` (preinstalled on macOS).
 
 ## Usage
 

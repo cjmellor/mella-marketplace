@@ -6,14 +6,14 @@
   },
   "metadata": {
     "description": "Mella's curated marketplace of Claude Code plugins",
-    "version": "1.20.1"
+    "version": "1.21.0"
   },
   "plugins": [
     {
       "name": "mella",
       "source": "./plugins/mella",
       "description": "Mella's collection of productivity tools for Claude Code",
-      "version": "1.16.1",
+      "version": "1.16.2",
       "keywords": ["testing", "walkthrough", "documentation", "qa", "code-review", "review", "review-bot", "pitch", "ideation", "worktree", "provisioning"],
       "license": "MIT"
     },
@@ -44,8 +44,8 @@
     {
       "name": "artisan-dev",
       "source": "./plugins/artisan-dev",
-      "description": "Runs `php artisan dev` for a Laravel project and manages it from a pane: per-process logs, restart and stop controls, port override, site and tunnel links.",
-      "version": "0.3.1",
+      "description": "Runs `php artisan dev` for a Laravel project and manages it from a pane: per-process logs, restart and stop controls, port override, the site link, and a public tunnel whose links it checks.",
+      "version": "0.4.0",
       "keywords": ["laravel", "dev-server", "pane", "mod", "artisan"],
       "license": "MIT"
     },
