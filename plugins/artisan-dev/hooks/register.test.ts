@@ -256,16 +256,16 @@ test('clearing the log empties every log and error count but keeps the process r
 })
 
 test('reads APP_URL from .env, skipping commented lines and trailing comments', () => {
-  const text = '#APP_URL=http://localhost:8000\nAPP_URL=https://voice-isolator.test # valet\nAPP_NAME=x'
+  const text = '#APP_URL=http://localhost:8000\nAPP_URL=https://acme.test # valet\nAPP_NAME=x'
 
-  expect(parseEnvValue(text, 'APP_URL')).toBe('https://voice-isolator.test')
+  expect(parseEnvValue(text, 'APP_URL')).toBe('https://acme.test')
   expect(parseEnvValue('APP_URL="http://app.test"', 'APP_URL')).toBe('http://app.test')
   expect(parseEnvValue('APP_NAME=x', 'APP_URL')).toBeNull()
   expect(parseEnvValue('APP_URL=', 'APP_URL')).toBe('')
 })
 
 test('open site uses APP_URL, but a local address gets the real server port', () => {
-  expect(siteUrl('https://voice-isolator.test', 8111)).toBe('https://voice-isolator.test')
+  expect(siteUrl('https://acme.test', 8111)).toBe('https://acme.test')
   expect(siteUrl('http://localhost', 8111)).toBe('http://localhost:8111')
   expect(siteUrl('http://localhost:8000/app', 8111)).toBe('http://localhost:8111/app')
   expect(siteUrl('http://127.0.0.1', null)).toBe('http://127.0.0.1')
@@ -304,19 +304,19 @@ test('matches a process by name, case-insensitively, or by its number', () => {
 
 test('status text summarises every process', () => {
   const two = applyEvent(started, { type: 'start', label: 'queue', command: 'q', time: '2026-10-03T16:00:00.000Z' })
-  const text = statusText('voice-isolator', two, 8111, 'https://voice-isolator.test', Date.parse('2026-10-03T16:02:00.000Z'))
+  const text = statusText('acme', two, 8111, 'https://acme.test', Date.parse('2026-10-03T16:02:00.000Z'))
 
-  expect(text.split('\n')[0]).toBe('voice-isolator dev — running · 2/2 up · :8111')
-  expect(text).toContain('https://voice-isolator.test')
+  expect(text.split('\n')[0]).toBe('acme dev — running · 2/2 up · :8111')
+  expect(text).toContain('https://acme.test')
   expect(text).toContain('● queue')
-  expect(statusText('voice-isolator', empty, null, 'u', 0)).toBe('Dev servers are not running.')
+  expect(statusText('acme', empty, null, 'u', 0)).toBe('Dev servers are not running.')
 })
 
 test('finds the tunnel URL in the real cloudflared and app output, and skips the stale one', () => {
   const box = '2026-10-03T16:17:20Z INF |  https://screenshots-watch-ind-throughout.trycloudflare.com                                |'
   const app = ' INFO TUNNEL_URL updated to: https://screenshots-watch-ind-throughout.trycloudflare.com. '
   const stale = '2026-10-03T16:17:20Z INF Environmental variables map[TUNNEL_URL:https://height-grocery-southern-girls.trycloudflare.com]'
-  const local = ' INFO Tunnelling https://voice-isolator.test (host: voice-isolator.test). '
+  const local = ' INFO Tunnelling https://acme.test (host: acme.test). '
 
   expect(findTunnelUrl(box)).toBe('https://screenshots-watch-ind-throughout.trycloudflare.com')
   expect(findTunnelUrl(app)).toBe('https://screenshots-watch-ind-throughout.trycloudflare.com')
@@ -447,8 +447,8 @@ test('an ANSI entry is laid out on its visible text, not its escape codes', () =
 })
 
 test('names the host of a site that is not loopback', () => {
-  expect(siteHost('https://kandu-purring-crafting.test')).toBe('kandu-purring-crafting.test')
-  expect(siteHost('https://kandu.test:8443/app')).toBe('kandu.test')
+  expect(siteHost('https://acme-blue-heron.test')).toBe('acme-blue-heron.test')
+  expect(siteHost('https://acme.test:8443/app')).toBe('acme.test')
   expect(siteHost('http://localhost:8000')).toBeNull()
   expect(siteHost('http://127.0.0.1')).toBeNull()
   expect(siteHost('http://0.0.0.0:8000')).toBeNull()
@@ -458,11 +458,11 @@ test('names the host of a site that is not loopback', () => {
 
 
 test('a branch switch or a worktree appearing counts as a change, the first read does not', () => {
-  const porcelain = 'worktree /a/kandu\nHEAD abc\nbranch refs/heads/main\n'
+  const porcelain = 'worktree /a/acme\nHEAD abc\nbranch refs/heads/main\n'
   const main = parseLayout('main\n', '', porcelain)
-  const added = parseLayout('main\n', '', `${porcelain}\nworktree /a/kandu/.claude/worktrees/x\nHEAD abc\n`)
+  const added = parseLayout('main\n', '', `${porcelain}\nworktree /a/acme/.claude/worktrees/x\nHEAD abc\n`)
 
-  expect(main).toEqual({ branch: 'main', worktrees: ['/a/kandu'] })
+  expect(main).toEqual({ branch: 'main', worktrees: ['/a/acme'] })
   expect(layoutChange(null, main)).toBeNull()
   expect(layoutChange(main, main)).toBeNull()
   expect(layoutChange(main, parseLayout('', 'abc123\n', porcelain))).toBe('Branch changed to abc123')
@@ -485,7 +485,7 @@ test('only a severity marker where the tool puts one counts as an error', () => 
   expect(hasError('[previous exception] [object] (PDOException(code: 42P01): SQLSTATE[42P01]: Undefined table')).toBe(false)
   expect(hasError('                      ^ (Connection: pgsql, SQL: select * from "cache")')).toBe(false)
   expect(hasError('Error handling is configured for the failed jobs table')).toBe(false)
-  expect(hasError('[2026-10-04 14:21:39] local.DEBUG: [vite] connected. {"url":"https://kandu.test/login"}')).toBe(false)
+  expect(hasError('[2026-10-04 14:21:39] local.DEBUG: [vite] connected. {"url":"https://acme.test/login"}')).toBe(false)
   expect(hasError('it_handles_failed_jobs ✓')).toBe(false)
 })
 
@@ -504,33 +504,33 @@ const HOST = 'rare-otter-gate.trycloudflare.com'
 
 test('sorts each link that points away from the tunnel by why it does', () => {
   const html = [
-    '<link rel="stylesheet" href="https://voice-isolator.test/build/assets/app.css">',
-    '<script type="module" src="https://voice-isolator.test:5173/@vite/client"></script>',
+    '<link rel="stylesheet" href="https://acme.test/build/assets/app.css">',
+    '<script type="module" src="https://acme.test:5173/@vite/client"></script>',
     '<a href="http://rare-otter-gate.trycloudflare.com/guides">Guides</a>',
     '<a href="http://localhost:8000/auth">Sign in</a>',
-    '<form action="https://kandu-purring-crafting.test/logout"></form>',
+    '<form action="https://acme-blue-heron.test/logout"></form>',
     '<a href="https://rare-otter-gate.trycloudflare.com/ok">ok</a>',
     '<a href="/relative">rel</a>',
     '<script src="https://cdn.jsdelivr.net/npm/alpinejs"></script>',
   ].join('\n')
 
   expect(findLeftovers(html, HOST)).toEqual([
-    { kind: 'local-host', url: 'https://voice-isolator.test/build/assets/app.css' },
-    { kind: 'vite', url: 'https://voice-isolator.test:5173/@vite/client' },
+    { kind: 'local-host', url: 'https://acme.test/build/assets/app.css' },
+    { kind: 'vite', url: 'https://acme.test:5173/@vite/client' },
     { kind: 'plain-http', url: 'http://rare-otter-gate.trycloudflare.com/guides' },
     { kind: 'local-host', url: 'http://localhost:8000/auth' },
-    { kind: 'local-host', url: 'https://kandu-purring-crafting.test/logout' },
+    { kind: 'local-host', url: 'https://acme-blue-heron.test/logout' },
   ])
 })
 
 test('canonical and alternate links name the real site, so they never count', () => {
   const html = [
-    '<link rel="canonical" href="https://voice-isolator.test/" />',
-    '<link rel="alternate" hreflang="en" href="https://voice-isolator.test/en">',
-    '<link href="https://voice-isolator.test/build/app.css" rel="stylesheet">',
+    '<link rel="canonical" href="https://acme.test/" />',
+    '<link rel="alternate" hreflang="en" href="https://acme.test/en">',
+    '<link href="https://acme.test/build/app.css" rel="stylesheet">',
   ].join('\n')
 
-  expect(findLeftovers(html, HOST)).toEqual([{ kind: 'local-host', url: 'https://voice-isolator.test/build/app.css' }])
+  expect(findLeftovers(html, HOST)).toEqual([{ kind: 'local-host', url: 'https://acme.test/build/app.css' }])
 })
 
 test('a host that only contains .test is not a local host', () => {
@@ -560,15 +560,15 @@ test('the report names one fix for each kind of leftover, and still gives the UR
   const report = shareReport(shared({
     state: 'broken',
     leftovers: [
-      { kind: 'local-host', url: 'https://voice-isolator.test/a.css' },
-      { kind: 'local-host', url: 'https://voice-isolator.test/b.js' },
-      { kind: 'vite', url: 'https://voice-isolator.test:5173/@vite/client' },
+      { kind: 'local-host', url: 'https://acme.test/a.css' },
+      { kind: 'local-host', url: 'https://acme.test/b.js' },
+      { kind: 'vite', url: 'https://acme.test:5173/@vite/client' },
     ],
   }))
 
   expect(report).toContain(`Tunnel: ${TUNNEL}`)
   expect(report).toContain('3 links point away from the tunnel')
-  expect(report).toContain('https://voice-isolator.test/a.css (+1)')
+  expect(report).toContain('https://acme.test/a.css (+1)')
   expect(report).toContain('URL::useOrigin')
   expect(report).toContain('Stop Vite')
   expect(shareReport(shared({ state: 'broken', note: 'The page answered 500 through the tunnel.' }))).toContain('answered 500')

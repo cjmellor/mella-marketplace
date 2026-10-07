@@ -40,7 +40,7 @@ Override it for the session with `--port=8111`, `-p 8111` or `port=8111` on `/de
 
 The override lives in the session only. It is never written to `.env`, and it stays in place until you reset it or the session ends.
 
-The site opens at `APP_URL` from the `.env` of the checkout the session is in, so inside a worktree it is that worktree's site. A loopback `APP_URL` (`localhost` or `127.0.0.1`) gets the real port; any other host is used as written. The band link is labelled with that host (`kandu.test ↗`), or `:port ↗` for a loopback `APP_URL`.
+The site opens at `APP_URL` from the `.env` of the checkout the session is in, so inside a worktree it is that worktree's site. A loopback `APP_URL` (`localhost` or `127.0.0.1`) gets the real port; any other host is used as written. The band link is labelled with that host (`acme.test ↗`), or `:port ↗` for a loopback `APP_URL`.
 
 ### The pane
 
