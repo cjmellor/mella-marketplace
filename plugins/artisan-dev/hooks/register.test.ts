@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
-import type { Dev } from '../types'
-import { hasError, layoutChange, parseLayout, pickDir, applyEvent, colorFor, applySgr, buttonGrid, buttonText, clearedLog, color256, afterCarriage, findTunnelUrl, layoutEntry, isProblem, logText, matchProcess, parseHosts, statusText, visibleEntries, effectivePort, gridRows, hasAnsi, logRoom, nextBack, judgeExit, noProcess, parseAnsi, wrapRanges, wrapSegments, parseDevArgs, statusColor, parseDevList, parseEnvPort, parseEnvValue, siteUrl, siteHost, promptText, rule, spawnArgv, toPort, PGID_MARK, splitLines, stripAnsi, summarise, uptime, wrapText } from './register'
+import type { Dev, Share } from '../types'
+import { assetUrls, buildArgv, findLeftovers, isTunnelWarming, isViteCommand, readCurl, resolveLocation, shareBand, shareReport, hasError, layoutChange, parseLayout, pickDir, applyEvent, colorFor, applySgr, buttonGrid, buttonText, clearedLog, color256, afterCarriage, findTunnelUrl, layoutEntry, isProblem, logText, matchProcess, parseHosts, statusText, visibleEntries, effectivePort, gridRows, hasAnsi, logRoom, nextBack, judgeExit, noProcess, parseAnsi, wrapRanges, wrapSegments, parseDevArgs, statusColor, parseDevList, parseEnvPort, parseEnvValue, siteUrl, siteHost, promptText, rule, spawnArgv, toPort, PGID_MARK, splitLines, stripAnsi, summarise, uptime, wrapText } from './register'
 
 const empty: Dev = { status: 'running', procs: [], feed: [], notes: [] }
 const started = applyEvent(empty, { type: 'start', label: 'server', command: 'php artisan serve', pid: 10, time: '2026-10-03T16:00:00.000Z' })
@@ -378,7 +378,10 @@ test('parses the errors, copy and tunnel subcommands', () => {
   expect(parseDevArgs('tunnel')).toEqual({ action: 'tunnel' })
   expect(parseDevArgs('copy vite')).toEqual({ action: 'copy', target: 'vite' })
   expect(parseDevArgs('copy a b').error).toContain('Unknown argument "b"')
-  expect(parseDevArgs('tunnel queue').error).toContain('Unknown argument')
+  expect(parseDevArgs('tunnel open')).toEqual({ action: 'tunnel', target: 'open' })
+  expect(parseDevArgs('tunnel close')).toEqual({ action: 'tunnel', target: 'close' })
+  expect(parseDevArgs('tunnel queue').error).toContain('Unknown tunnel action "queue"')
+  expect(parseDevArgs('tunnel open now').error).toContain('Unknown argument "now"')
 })
 
 test('a port belongs to every process, so it cannot be combined with restarting one', () => {
@@ -494,4 +497,118 @@ test('runs from the session checkout once it is provisioned, else stays put', ()
   expect(pickDir({ ...dirs, ready: false, current: '' })).toBe('/app')
   expect(pickDir({ ...dirs, ready: false, current: '', main: '' })).toBe('/app/.claude/worktrees/wt')
   expect(pickDir({ ...dirs, pinned: '/elsewhere' })).toBe('/elsewhere')
+})
+
+const TUNNEL = 'https://rare-otter-gate.trycloudflare.com'
+const HOST = 'rare-otter-gate.trycloudflare.com'
+
+test('sorts each link that points away from the tunnel by why it does', () => {
+  const html = [
+    '<link rel="stylesheet" href="https://voice-isolator.test/build/assets/app.css">',
+    '<script type="module" src="https://voice-isolator.test:5173/@vite/client"></script>',
+    '<a href="http://rare-otter-gate.trycloudflare.com/guides">Guides</a>',
+    '<a href="http://localhost:8000/auth">Sign in</a>',
+    '<form action="https://kandu-purring-crafting.test/logout"></form>',
+    '<a href="https://rare-otter-gate.trycloudflare.com/ok">ok</a>',
+    '<a href="/relative">rel</a>',
+    '<script src="https://cdn.jsdelivr.net/npm/alpinejs"></script>',
+  ].join('\n')
+
+  expect(findLeftovers(html, HOST)).toEqual([
+    { kind: 'local-host', url: 'https://voice-isolator.test/build/assets/app.css' },
+    { kind: 'vite', url: 'https://voice-isolator.test:5173/@vite/client' },
+    { kind: 'plain-http', url: 'http://rare-otter-gate.trycloudflare.com/guides' },
+    { kind: 'local-host', url: 'http://localhost:8000/auth' },
+    { kind: 'local-host', url: 'https://kandu-purring-crafting.test/logout' },
+  ])
+})
+
+test('a host that only contains .test is not a local host', () => {
+  expect(findLeftovers('<a href="https://contest.example.com/a">a</a><a href="https://my.testing.io">b</a>', HOST)).toEqual([])
+})
+
+test('the assets to load are the tunnel-hosted CSS and JS, once each', () => {
+  const html = [
+    '<link href="/build/assets/app-1.css" rel="stylesheet">',
+    '<script src="/build/assets/app-2.js?v=3"></script>',
+    '<script src="/build/assets/app-2.js?v=3"></script>',
+    '<script src="https://rare-otter-gate.trycloudflare.com/livewire/livewire.min.js"></script>',
+    '<script src="https://cdn.example.com/lib.js"></script>',
+    '<link href="/favicon.ico" rel="icon">',
+  ].join('\n')
+
+  expect(assetUrls(html, TUNNEL)).toEqual([
+    `${TUNNEL}/build/assets/app-1.css`,
+    `${TUNNEL}/build/assets/app-2.js?v=3`,
+    `${TUNNEL}/livewire/livewire.min.js`,
+  ])
+})
+
+const shared = (overrides: Partial<Share>): Share => ({ state: 'open', dir: '/app', url: TUNNEL, leftovers: [], note: null, ...overrides })
+
+test('the report names one fix for each kind of leftover, and still gives the URL', () => {
+  const report = shareReport(shared({
+    state: 'broken',
+    leftovers: [
+      { kind: 'local-host', url: 'https://voice-isolator.test/a.css' },
+      { kind: 'local-host', url: 'https://voice-isolator.test/b.js' },
+      { kind: 'vite', url: 'https://voice-isolator.test:5173/@vite/client' },
+    ],
+  }))
+
+  expect(report).toContain(`Tunnel: ${TUNNEL}`)
+  expect(report).toContain('3 links point away from the tunnel')
+  expect(report).toContain('https://voice-isolator.test/a.css (+1)')
+  expect(report).toContain('URL::useOrigin')
+  expect(report).toContain('Stop Vite')
+  expect(shareReport(shared({ state: 'broken', note: 'The page answered 500 through the tunnel.' }))).toContain('answered 500')
+  expect(shareReport(shared({}))).toBe(`Tunnel: ${TUNNEL} (links checked)`)
+  expect(shareReport(shared({ state: 'failed', url: null, note: 'cloudflared is not installed' }))).toBe('Tunnel failed: cloudflared is not installed')
+  expect(shareReport(shared({ state: 'starting', url: null, note: 'building assets' }))).toBe('Tunnel is starting… (building assets)')
+})
+
+test('the band shows the tunnel state in its colour', () => {
+  expect(shareBand(shared({}))).toEqual({ text: ' · ⇄ tunnel ok', color: 'green' })
+  expect(shareBand(shared({ state: 'broken', leftovers: [{ kind: 'vite', url: 'x' }] }))).toEqual({ text: ' · ⇄ tunnel: 1 link points away', color: 'yellow' })
+  expect(shareBand(shared({ state: 'starting', note: 'building assets' })).text).toBe(' · ⇄ tunnel: building assets…')
+  expect(shareBand(shared({ state: 'failed' })).color).toBe('red')
+})
+
+test('the Vite process is found by its command', () => {
+  expect(isViteCommand('bun run dev')).toBe(true)
+  expect(isViteCommand('npm run dev')).toBe(true)
+  expect(isViteCommand('npx vite')).toBe(true)
+  expect(isViteCommand('php artisan serve')).toBe(false)
+  expect(isViteCommand('php artisan queue:listen')).toBe(false)
+  expect(isViteCommand('npm run devtools')).toBe(false)
+})
+
+test('the build runs with the lockfile package manager, and only when a build script exists', () => {
+  const withBuild = JSON.stringify({ scripts: { build: 'vite build', dev: 'vite' } })
+
+  expect(buildArgv(withBuild, ['bun.lock'])).toEqual(['bun', 'run', 'build'])
+  expect(buildArgv(withBuild, ['pnpm-lock.yaml'])).toEqual(['pnpm', 'run', 'build'])
+  expect(buildArgv(withBuild, [])).toEqual(['npm', 'run', 'build'])
+  expect(buildArgv(JSON.stringify({ scripts: { dev: 'vite' } }), ['bun.lock'])).toBeNull()
+  expect(buildArgv('not json', ['bun.lock'])).toBeNull()
+})
+
+test('a redirect is followed to an absolute or root-relative location only', () => {
+  expect(resolveLocation('/login', `${TUNNEL}/dashboard`)).toBe(`${TUNNEL}/login`)
+  expect(resolveLocation('https://other.example/x', TUNNEL)).toBe('https://other.example/x')
+  expect(resolveLocation('login', TUNNEL)).toBeNull()
+  expect(resolveLocation('//evil.example', TUNNEL)).toBeNull()
+})
+
+test('reads the status that curl writes after the body', () => {
+  expect(readCurl('<html></html>\n__artisan_dev_status__:200')).toEqual({ status: 200, text: '<html></html>' })
+  expect(readCurl('curl: (6) Could not resolve host')).toBeNull()
+})
+
+test('a tunnel that is not reachable yet answers with a gateway or Cloudflare status', () => {
+  expect(isTunnelWarming(530)).toBe(true)
+  expect(isTunnelWarming(502)).toBe(true)
+  expect(isTunnelWarming(200)).toBe(false)
+  expect(isTunnelWarming(500)).toBe(false)
+  expect(isTunnelWarming(404)).toBe(false)
 })

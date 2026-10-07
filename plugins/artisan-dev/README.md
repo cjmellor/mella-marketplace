@@ -9,6 +9,7 @@ artisan-dev is a Claude Code mod. `/dev` starts every process `php artisan dev` 
 - A Claude Code build that loads plugin modules (mods).
 - A Laravel app whose Artisan has `dev` and `dev:list`.
 - macOS: processes are launched through `perl` (preinstalled) and the site is opened with `open`.
+- For `/dev tunnel open`: `cloudflared` on the PATH (`brew install cloudflared`).
 
 ## Usage
 
@@ -26,7 +27,9 @@ artisan-dev is a Claude Code mod. `/dev` starts every process `php artisan dev` 
 | `/dev clear` | Clear the log |
 | `/dev errors` | Toggle showing only errors and warnings |
 | `/dev copy [name]` | Copy a process log (or the all view) to the clipboard |
-| `/dev tunnel` | Show and copy the public tunnel URL |
+| `/dev tunnel` | Show and copy the public tunnel URL, or the open tunnel's report |
+| `/dev tunnel open` | Open a public tunnel to this checkout and check its links (again: check them again) |
+| `/dev tunnel close` | Close that tunnel and start Vite again |
 | `/dev help` | List the commands |
 
 ### Port
@@ -42,9 +45,9 @@ The site opens at `APP_URL` from the `.env` of the checkout the session is in, s
 ### The pane
 
 - **Processes** — `0` shows the combined log in arrival order; `1`–`9` pick a process. The up and down arrows move between process names only.
-- **Toolbar** — `x` Stop all (or `s` Start all), `r` Restart all, `t` Restart one (the selected process), `o` Open site, `u` Copy tunnel (shown once a tunnel URL is known), `c` Copy log, `a` Ask Claude (attaches the state and recent output to your next prompt; the button then reads `asked ✓` and drops it).
+- **Toolbar** — `x` Stop all (or `s` Start all), `r` Restart all, `t` Restart one (the selected process), `o` Open site, `n` Open tunnel (or Close tunnel), `k` Check again (when the tunnel's links point away from it), `u` Copy tunnel (shown once a tunnel URL is known), `c` Copy log, `a` Ask Claude (attaches the state and recent output to your next prompt; the button then reads `asked ✓` and drops it).
 - **Log** — keeps each process's own colours, wraps long lines, and scrolls with the wheel, page keys, Home and End. `e` (or the button in the Log divider) shows only errors and warnings.
-- **Band above the prompt** — status dot, a clickable site link (see Port above), how many processes are up and an error count. `+` and `−` open and close the pane.
+- **Band above the prompt** — status dot, a clickable site link (see Port above), how many processes are up, an error count and the tunnel's state. `+` and `−` open and close the pane.
 
 ### Errors
 
@@ -60,7 +63,25 @@ Reloading the mod or ending the session stops the servers. Anything left over fr
 
 ### Tunnels
 
-When a process prints a public tunnel URL (Cloudflare, ngrok, Expose and Herd share, localtunnel, localhost.run, Serveo, Pinggy, Tailscale funnel, Dev Tunnels and similar), the mod shows a toast and offers **Copy tunnel**. Detection reads process output, so a tunnel started outside the dev processes, such as from Herd's own Share button, isn't seen.
+`/dev tunnel open` (or `n` in the pane) opens a Cloudflare quick tunnel to the checkout the servers run from, for a browser that is not on your machine, such as a cloud test browser. It:
+
+1. stops the dev process that runs Vite (its command runs `vite` or `run dev`) and keeps it stopped while the tunnel is open, Restart all included, because a Vite dev server sends the browser to `:5173` on a host it cannot reach;
+2. runs the app's `build` script with the lockfile's package manager;
+3. starts its own `php artisan serve` on the first free port from 8100, and `cloudflared tunnel --url` to that port, with no Host rewrite, so the app sees the tunnel's own host;
+4. fetches `/` through the tunnel and loads its CSS and JS.
+
+**Copy tunnel** appears only when no link on the page points away from the tunnel. Otherwise the band says how many do, and `/dev tunnel` lists them with the fix each kind needs in the app:
+
+| Link | Why | Fix in the app |
+|------|-----|----------------|
+| `https://site.test/…`, `localhost`, `127.0.0.1` | The app builds links from `APP_URL` | Let web requests use their own host: drop `URL::useOrigin` or `URL::forceRootUrl` for them |
+| `http://<tunnel>/…` | The app thinks the request is plain http | `URL::forceScheme('https')` in `AppServiceProvider` |
+| `:5173` | A Vite dev server is writing `public/hot` | Stop Vite in this checkout |
+| Any asset that does not answer 200 | It does not load through the tunnel | — |
+
+The mod never edits `.env`. Fix the app, then `/dev tunnel open` (or `k`) checks again on the same URL. `/dev tunnel close`, the session moving to another checkout, and the session ending all close the tunnel; closing it starts Vite again when the servers are running. `/clear` keeps it open.
+
+A process of your own that prints a public tunnel URL (Cloudflare, ngrok, Expose and Herd share, localtunnel, localhost.run, Serveo, Pinggy, Tailscale funnel, Dev Tunnels and similar), such as a webhook tunnel, is still detected: the mod shows a toast and offers **Copy tunnel**, but its links are not checked, and an open tunnel of the mod's takes its place in the button. Detection reads process output, so a tunnel started outside the dev processes, such as from Herd's own Share button, isn't seen.
 
 ## Settings
 
@@ -71,14 +92,14 @@ When a process prints a public tunnel URL (Cloudflare, ngrok, Expose and Herd sh
 
 ## Development
 
-The pure logic (argument parsing, `.env` reading, ANSI handling, layout, exit policy) is covered by `hooks/register.test.ts`:
+The pure logic (argument parsing, `.env` reading, ANSI handling, layout, exit policy, the tunnel's link check) is covered by `hooks/register.test.ts`:
 
 ```bash
 claude plugin validate plugins/artisan-dev
 claude plugin test plugins/artisan-dev
 ```
 
-The process lifecycle (starting, stopping, restarting) isn't covered by tests, because the test kit can't mock process spawning.
+The process lifecycle (starting, stopping, restarting, and the tunnel's serve and `cloudflared`) isn't covered by tests, because the test kit can't mock process spawning.
 
 ## License
 

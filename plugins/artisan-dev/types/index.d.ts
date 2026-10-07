@@ -38,6 +38,20 @@ export type DevEvent = {
 
 export type Layout = { branch: string; worktrees: string[] }
 
+export type ShareState = 'starting' | 'checking' | 'open' | 'broken' | 'failed'
+
+export type LeftoverKind = 'local-host' | 'plain-http' | 'vite' | 'broken'
+
+export type Leftover = { kind: LeftoverKind; url: string }
+
+export type Share = {
+  state: ShareState
+  dir: string
+  url: string | null
+  leftovers: Leftover[]
+  note: string | null
+}
+
 declare module 'claude-code' {
   interface PluginState {
     'artisan-dev': {
@@ -52,6 +66,7 @@ declare module 'claude-code' {
       back: number
       onlyErrors: boolean
       tunnel: { label: string; url: string } | null
+      share: Share | null
       attached: { label: string | null; text: string } | null
       layout: Layout | null
     }
