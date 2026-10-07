@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import type { Dev, Share } from '../types'
-import { assetUrls, buildArgv, findLeftovers, isTunnelWarming, isViteCommand, readCurl, resolveLocation, shareBand, shareReport, hasError, layoutChange, parseLayout, pickDir, applyEvent, colorFor, applySgr, buttonGrid, buttonText, clearedLog, color256, afterCarriage, findTunnelUrl, layoutEntry, isProblem, logText, matchProcess, parseHosts, statusText, visibleEntries, effectivePort, gridRows, hasAnsi, logRoom, nextBack, judgeExit, noProcess, parseAnsi, wrapRanges, wrapSegments, parseDevArgs, statusColor, parseDevList, parseEnvPort, parseEnvValue, siteUrl, siteHost, promptText, rule, spawnArgv, toPort, PGID_MARK, splitLines, stripAnsi, summarise, uptime, wrapText } from './register'
+import { assetUrls, buildArgv, findLeftovers, hasAddress, isTunnelWarming, isViteCommand, readCurl, resolveLocation, shareBand, shareReport, hasError, layoutChange, parseLayout, pickDir, applyEvent, colorFor, applySgr, buttonGrid, buttonText, clearedLog, color256, afterCarriage, findTunnelUrl, layoutEntry, isProblem, logText, matchProcess, parseHosts, statusText, visibleEntries, effectivePort, gridRows, hasAnsi, logRoom, nextBack, judgeExit, noProcess, parseAnsi, wrapRanges, wrapSegments, parseDevArgs, statusColor, parseDevList, parseEnvPort, parseEnvValue, siteUrl, siteHost, promptText, rule, spawnArgv, toPort, PGID_MARK, splitLines, stripAnsi, summarise, uptime, wrapText } from './register'
 
 const empty: Dev = { status: 'running', procs: [], feed: [], notes: [] }
 const started = applyEvent(empty, { type: 'start', label: 'server', command: 'php artisan serve', pid: 10, time: '2026-10-03T16:00:00.000Z' })
@@ -603,6 +603,14 @@ test('a redirect is followed to an absolute or root-relative location only', () 
 test('reads the status that curl writes after the body', () => {
   expect(readCurl('<html></html>\n__artisan_dev_status__:200')).toEqual({ status: 200, text: '<html></html>' })
   expect(readCurl('curl: (6) Could not resolve host')).toBeNull()
+})
+
+test('dig has answered only when it prints an address', () => {
+  expect(hasAddress('104.16.230.132\n104.16.231.132\n')).toBe(true)
+  expect(hasAddress('2606:4700::6810:e684\n')).toBe(true)
+  expect(hasAddress('')).toBe(false)
+  expect(hasAddress(';; connection timed out; no servers could be reached\n')).toBe(false)
+  expect(hasAddress('some.cname.example.\n')).toBe(false)
 })
 
 test('a tunnel that is not reachable yet answers with a gateway or Cloudflare status', () => {

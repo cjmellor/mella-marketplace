@@ -1504,6 +1504,10 @@ const REACH_GAP_MS = 2000
 const MAX_ASSETS = 10
 const MAX_HOPS = 5
 const CURL_STATUS = '__artisan_dev_status__:'
+const PUBLIC_RESOLVER = '1.1.1.1'
+const DNS_WAIT_MS = 60_000
+const DNS_GAP_MS = 1000
+const DNS_STREAK = 3
 
 function deferred<T>() {
   let resolve: (value: T | null) => void = () => {}
@@ -1711,7 +1715,31 @@ async function fetchPage($: EngineInterface, url: string): Promise<{ status: num
 
 export const isTunnelWarming = (status: number): boolean => status === 502 || status === 503 || status === 504 || (status >= 520 && status <= 530)
 
+export const hasAddress = (digOutput: string): boolean =>
+  digOutput.split('\n').some(line => /^(?:\d{1,3}\.){3}\d{1,3}$|^[0-9a-f:]+:[0-9a-f:]*$/i.test(line.trim()))
+
+async function awaitPublicDns($: EngineInterface, host: string, turn: number) {
+  let streak = 0
+
+  for (let waited = 0; waited < DNS_WAIT_MS && streak < DNS_STREAK && turn === shareTurn; waited += DNS_GAP_MS) {
+    const dug = await $.process.run(['dig', '+short', '+time=2', '+tries=1', `@${PUBLIC_RESOLVER}`, host], { timeoutMs: 5000 }).catch(() => null)
+
+    if (!dug) {
+      return
+    }
+
+    streak = hasAddress(dug.stdout) ? streak + 1 : 0
+
+    if (streak < DNS_STREAK) {
+      await $.clock.sleep(DNS_GAP_MS)
+    }
+  }
+}
+
 async function reachPage($: EngineInterface, url: string, turn: number): Promise<{ status: number; text: string } | null> {
+  // macOS caches a "not found" answer for a quick-tunnel host looked up before its DNS exists, so no request may go out first.
+  await awaitPublicDns($, hostOf(url), turn)
+
   for (let attempt = 0; attempt < REACH_TRIES && turn === shareTurn; attempt++) {
     const page = await fetchPage($, url)
 
