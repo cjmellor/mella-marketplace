@@ -409,6 +409,8 @@ export const LEFTOVER_FIXES: Record<LeftoverKind, string> = {
   broken: 'These assets do not load through the tunnel.',
 }
 
+const FIRST_VISIT = 'A new tunnel can take about 20 seconds to resolve for the first visit.'
+
 export const shareReport = (current: Share): string => {
   if (current.state === 'failed') {
     return `Tunnel failed: ${current.note ?? 'unknown error'}`
@@ -419,7 +421,7 @@ export const shareReport = (current: Share): string => {
   }
 
   if (current.state === 'open') {
-    return `Tunnel: ${current.url} (links checked)`
+    return `Tunnel: ${current.url} (links checked)\n${FIRST_VISIT}`
   }
 
   const kinds = [...new Set(current.leftovers.map(leftover => leftover.kind))]
@@ -1505,15 +1507,10 @@ const SERVE_WAIT_MS = 20_000
 const SHARE_PORTS = { first: 8100, count: 50 }
 const TUNNEL_WAIT_MS = 45_000
 const BUILD_TIMEOUT_MS = 300_000
-const REACH_TRIES = 15
-const REACH_GAP_MS = 2000
 const MAX_ASSETS = 10
 const MAX_HOPS = 5
 const CURL_STATUS = '__artisan_dev_status__:'
-const PUBLIC_RESOLVER = '1.1.1.1'
-const DNS_WAIT_MS = 60_000
-const DNS_GAP_MS = 1000
-const DNS_STREAK = 3
+const TUNNEL_REGISTERED = /Registered tunnel connection/i
 
 function deferred<T>() {
   let resolve: (value: T | null) => void = () => {}
@@ -1671,89 +1668,49 @@ async function buildAssets($: EngineInterface, dir: string): Promise<string | nu
   }
 }
 
-export const resolveLocation = (location: string, from: string): string | null => {
-  if (/^https?:\/\//i.test(location)) {
+export const localPath = (location: string, hosts: string[]): string | null => {
+  if (location.startsWith('/') && !location.startsWith('//')) {
     return location
   }
 
-  const origin = from.match(/^https?:\/\/[^/?#]+/i)?.[0]
+  const absolute = location.match(/^https?:\/\/([^/?#]+)(.*)$/i)
 
-  return origin && location.startsWith('/') && !location.startsWith('//') ? `${origin}${location}` : null
+  return absolute && hosts.includes((absolute[1] ?? '').toLowerCase()) ? absolute[2] || '/' : null
 }
 
-export const readCurl = (stdout: string): { status: number; text: string } | null => {
+export const readCurl = (stdout: string): { status: number; text: string; location: string } | null => {
   const at = stdout.lastIndexOf(`\n${CURL_STATUS}`)
-  const status = at < 0 ? NaN : Number(stdout.slice(at + CURL_STATUS.length + 1).trim())
+  const [code = '', location = ''] = at < 0 ? [] : stdout.slice(at + CURL_STATUS.length + 1).trim().split(' ')
+  const status = Number(code)
 
-  return Number.isInteger(status) && status > 0 ? { status, text: stdout.slice(0, at) } : null
+  return Number.isInteger(status) && status > 0 ? { status, text: stdout.slice(0, at), location } : null
 }
 
-async function curlPage($: EngineInterface, url: string): Promise<{ status: number; text: string } | null> {
-  try {
-    const result = await $.process.run(['curl', '-sS', '-L', '--max-time', '15', '-w', `\n${CURL_STATUS}%{http_code}`, url], { timeoutMs: 20_000 })
+async function askServe($: EngineInterface, port: number, tunnelHost: string, path: string): Promise<{ status: number; text: string } | null> {
+  const hosts = [tunnelHost, `127.0.0.1:${port}`]
+  let target = path
 
-    return readCurl(result.stdout)
-  } catch {
-    return null
-  }
-}
+  for (let hop = 0; hop < MAX_HOPS; hop++) {
+    const result = await $.process
+      .run(
+        [
+          'curl', '-sS', '--max-time', '15',
+          '-H', `Host: ${tunnelHost}`,
+          '-H', 'X-Forwarded-Proto: https',
+          '-w', `\n${CURL_STATUS}%{http_code} %{redirect_url}`,
+          `http://127.0.0.1:${port}${target}`,
+        ],
+        { timeoutMs: 20_000 },
+      )
+      .catch(() => null)
+    const page = result ? readCurl(result.stdout) : null
+    const next = page && page.status >= 300 && page.status < 400 ? localPath(page.location, hosts) : null
 
-async function fetchPage($: EngineInterface, url: string): Promise<{ status: number; text: string } | null> {
-  try {
-    let target = url
-
-    for (let hop = 0; hop < MAX_HOPS; hop++) {
-      const response = await $.http.fetch(target)
-      const next = response.status >= 300 && response.status < 400 ? resolveLocation(response.headers.location ?? '', target) : null
-
-      if (!next) {
-        return { status: response.status, text: response.text }
-      }
-
-      target = next
+    if (!page || !next) {
+      return page && { status: page.status, text: page.text }
     }
 
-    return null
-  } catch {
-    return curlPage($, url)
-  }
-}
-
-export const isTunnelWarming = (status: number): boolean => status === 502 || status === 503 || status === 504 || (status >= 520 && status <= 530)
-
-export const hasAddress = (digOutput: string): boolean =>
-  digOutput.split('\n').some(line => /^(?:\d{1,3}\.){3}\d{1,3}$|^[0-9a-f:]+:[0-9a-f:]*$/i.test(line.trim()))
-
-async function awaitPublicDns($: EngineInterface, host: string, turn: number) {
-  let streak = 0
-
-  for (let waited = 0; waited < DNS_WAIT_MS && streak < DNS_STREAK && turn === shareTurn; waited += DNS_GAP_MS) {
-    const dug = await $.process.run(['dig', '+short', '+time=2', '+tries=1', `@${PUBLIC_RESOLVER}`, host], { timeoutMs: 5000 }).catch(() => null)
-
-    if (!dug) {
-      return
-    }
-
-    streak = hasAddress(dug.stdout) ? streak + 1 : 0
-
-    if (streak < DNS_STREAK) {
-      await $.clock.sleep(DNS_GAP_MS)
-    }
-  }
-}
-
-async function reachPage($: EngineInterface, url: string, turn: number): Promise<{ status: number; text: string } | null> {
-  // macOS caches a "not found" answer for a quick-tunnel host looked up before its DNS exists, so no request may go out first.
-  await awaitPublicDns($, hostOf(url), turn)
-
-  for (let attempt = 0; attempt < REACH_TRIES && turn === shareTurn; attempt++) {
-    const page = await fetchPage($, url)
-
-    if (page && !isTunnelWarming(page.status)) {
-      return page
-    }
-
-    await $.clock.sleep(REACH_GAP_MS)
+    target = next
   }
 
   return null
@@ -1762,25 +1719,28 @@ async function reachPage($: EngineInterface, url: string, turn: number): Promise
 async function checkShare($: EngineInterface): Promise<Share | null> {
   const current = await read($, share)
 
-  if (!current?.url) {
+  if (!current?.url || current.port === null) {
     return current
   }
 
   const turn = shareTurn
-  const url = current.url
+  const { url, port } = current
+  const host = hostOf(url)
 
   await update($, share, (): Share => ({ ...current, state: 'checking', leftovers: [], note: null }))
 
-  const page = await reachPage($, url, turn)
+  const page = await askServe($, port, host, '/')
   const loaded = page !== null && page.status < 400
-  const leftovers = loaded ? findLeftovers(page.text, hostOf(url)) : []
+  const leftovers = loaded ? findLeftovers(page.text, host) : []
 
   for (const asset of loaded ? assetUrls(page.text, url).slice(0, MAX_ASSETS) : []) {
     if (turn !== shareTurn) {
       break
     }
 
-    if ((await fetchPage($, asset))?.status !== 200) {
+    const path = localPath(asset, [host])
+
+    if (path && (await askServe($, port, host, path))?.status !== 200) {
       leftovers.push({ kind: 'broken', url: asset })
     }
   }
@@ -1789,7 +1749,7 @@ async function checkShare($: EngineInterface): Promise<Share | null> {
     return null
   }
 
-  const note = page === null ? 'The page did not load through the tunnel.' : loaded ? null : `The page answered ${page.status} through the tunnel.`
+  const note = page === null ? 'php artisan serve did not answer.' : loaded ? null : `The page answered ${page.status}.`
   const checked: Share = { ...current, state: leftovers.length > 0 || note ? 'broken' : 'open', leftovers, note }
 
   await update($, share, () => checked)
@@ -1806,7 +1766,7 @@ async function failShare($: EngineInterface, turn: number, note: string): Promis
   await stopShareProcs($)
   await releaseVite($, true)
 
-  const failed: Share = { state: 'failed', dir: (await read($, share))?.dir ?? project.dir, url: null, leftovers: [], note }
+  const failed: Share = { state: 'failed', dir: (await read($, share))?.dir ?? project.dir, port: null, url: null, leftovers: [], note }
 
   await update($, share, () => failed)
 
@@ -1818,7 +1778,7 @@ async function startShare($: EngineInterface): Promise<Share | null> {
 
   const turn = ++shareTurn
   const dir = project.dir
-  const starting = (note: string) => update($, share, (): Share => ({ state: 'starting', dir, url: null, leftovers: [], note }))
+  const starting = (note: string) => update($, share, (): Share => ({ state: 'starting', dir, port: null, url: null, leftovers: [], note }))
 
   await starting('looking for cloudflared')
 
@@ -1841,9 +1801,11 @@ async function startShare($: EngineInterface): Promise<Share | null> {
 
   const port = deferred<number>()
   const found = deferred<string>()
+  const registered = deferred<boolean>()
   const onExit = (proc: ShareProc) => {
     port.resolve(null)
     found.resolve(null)
+    registered.resolve(null)
     void failShare($, turn, `${proc.label} stopped${proc.tail.length > 0 ? `: ${proc.tail[proc.tail.length - 1]}` : ''}`)
   }
 
@@ -1886,6 +1848,10 @@ async function startShare($: EngineInterface): Promise<Share | null> {
       if (url) {
         found.resolve(url)
       }
+
+      if (TUNNEL_REGISTERED.test(line)) {
+        registered.resolve(true)
+      }
     }, onExit),
   )
 
@@ -1899,14 +1865,24 @@ async function startShare($: EngineInterface): Promise<Share | null> {
     return failShare($, turn, 'cloudflared printed no tunnel URL')
   }
 
-  await update($, share, (): Share => ({ state: 'checking', dir, url, leftovers: [], note: null }))
+  const isRegistered = await within($, registered.promise, TUNNEL_WAIT_MS)
+
+  if (turn !== shareTurn) {
+    return null
+  }
+
+  if (!isRegistered) {
+    return failShare($, turn, 'cloudflared did not register a connection')
+  }
+
+  await update($, share, (): Share => ({ state: 'checking', dir, port: served, url, leftovers: [], note: null }))
 
   return checkShare($)
 }
 
 function announceShare($: EngineInterface, result: Share | null) {
   if (result?.state === 'open') {
-    $.ui.toast(`Tunnel ready: ${result.url} — press u to copy`, { timeoutMs: 10_000 })
+    $.ui.toast(`Tunnel ready: ${result.url} — press u to copy. ${FIRST_VISIT}`, { timeoutMs: 10_000 })
   } else if (result?.state === 'broken') {
     const count = result.leftovers.length
     const why = count > 0 ? `${count} ${count === 1 ? 'link points' : 'links point'} away from it` : (result.note ?? 'it did not load')

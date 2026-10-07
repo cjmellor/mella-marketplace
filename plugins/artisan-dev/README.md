@@ -68,7 +68,7 @@ Reloading the mod or ending the session stops the servers. Anything left over fr
 1. stops the dev process that runs Vite (its command runs `vite` or `run dev`) and keeps it stopped while the tunnel is open, Restart all included, because a Vite dev server sends the browser to `:5173` on a host it cannot reach;
 2. runs the app's `build` script with the lockfile's package manager;
 3. starts its own `php artisan serve` on the first free port from 8100, and `cloudflared tunnel --url` to that port, with no Host rewrite, so the app sees the tunnel's own host;
-4. fetches `/` through the tunnel and loads its CSS and JS.
+4. once `cloudflared` reports a registered connection, asks its own serve for `/` and the page's CSS and JS as the tunnel would deliver them (the tunnel's `Host`, `X-Forwarded-Proto: https`). Nothing is looked up in public DNS, so a fresh tunnel host is never cached as missing on your machine. A new tunnel can still take about 20 seconds to resolve for its first visit from elsewhere.
 
 **Copy tunnel** appears only when no link on the page points away from the tunnel. Canonical and alternate links name the real site on purpose, so they never count. Otherwise the band says how many do, and `/dev tunnel` lists them with the fix each kind needs in the app:
 
@@ -77,7 +77,7 @@ Reloading the mod or ending the session stops the servers. Anything left over fr
 | `https://site.test/…`, `localhost`, `127.0.0.1` | The app builds links from `APP_URL` | Let web requests use their own host: drop `URL::useOrigin` or `URL::forceRootUrl` for them |
 | `http://<tunnel>/…` | The app thinks the request is plain http | `URL::forceScheme('https')` in `AppServiceProvider` |
 | `:5173` | A Vite dev server is writing `public/hot` | Stop Vite in this checkout |
-| Any asset that does not answer 200 | It does not load through the tunnel | — |
+| Any asset that does not answer 200 | The app does not serve it at that path | — |
 
 The mod never edits `.env`. Fix the app, then `/dev tunnel open` (or `k`) checks again on the same URL. `/dev tunnel close`, the session moving to another checkout, and the session ending all close the tunnel; closing it starts Vite again when the servers are running. `/clear` keeps it open.
 

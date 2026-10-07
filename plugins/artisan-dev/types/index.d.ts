@@ -47,6 +47,7 @@ export type Leftover = { kind: LeftoverKind; url: string }
 export type Share = {
   state: ShareState
   dir: string
+  port: number | null
   url: string | null
   leftovers: Leftover[]
   note: string | null

@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import type { Dev, Share } from '../types'
-import { assetUrls, buildArgv, findLeftovers, hasAddress, isTunnelWarming, isViteCommand, readCurl, resolveLocation, shareBand, shareReport, hasError, layoutChange, parseLayout, pickDir, applyEvent, colorFor, applySgr, buttonGrid, buttonText, clearedLog, color256, afterCarriage, findTunnelUrl, layoutEntry, isProblem, logText, matchProcess, parseHosts, statusText, visibleEntries, effectivePort, gridRows, hasAnsi, logRoom, nextBack, judgeExit, noProcess, parseAnsi, wrapRanges, wrapSegments, parseDevArgs, statusColor, parseDevList, parseEnvPort, parseEnvValue, siteUrl, siteHost, promptText, rule, spawnArgv, toPort, PGID_MARK, splitLines, stripAnsi, summarise, uptime, wrapText } from './register'
+import { assetUrls, buildArgv, findLeftovers, isViteCommand, localPath, readCurl, shareBand, shareReport, hasError, layoutChange, parseLayout, pickDir, applyEvent, colorFor, applySgr, buttonGrid, buttonText, clearedLog, color256, afterCarriage, findTunnelUrl, layoutEntry, isProblem, logText, matchProcess, parseHosts, statusText, visibleEntries, effectivePort, gridRows, hasAnsi, logRoom, nextBack, judgeExit, noProcess, parseAnsi, wrapRanges, wrapSegments, parseDevArgs, statusColor, parseDevList, parseEnvPort, parseEnvValue, siteUrl, siteHost, promptText, rule, spawnArgv, toPort, PGID_MARK, splitLines, stripAnsi, summarise, uptime, wrapText } from './register'
 
 const empty: Dev = { status: 'running', procs: [], feed: [], notes: [] }
 const started = applyEvent(empty, { type: 'start', label: 'server', command: 'php artisan serve', pid: 10, time: '2026-10-03T16:00:00.000Z' })
@@ -554,7 +554,7 @@ test('the assets to load are the tunnel-hosted CSS and JS, once each', () => {
   ])
 })
 
-const shared = (overrides: Partial<Share>): Share => ({ state: 'open', dir: '/app', url: TUNNEL, leftovers: [], note: null, ...overrides })
+const shared = (overrides: Partial<Share>): Share => ({ state: 'open', dir: '/app', port: 8100, url: TUNNEL, leftovers: [], note: null, ...overrides })
 
 test('the report names one fix for each kind of leftover, and still gives the URL', () => {
   const report = shareReport(shared({
@@ -572,7 +572,7 @@ test('the report names one fix for each kind of leftover, and still gives the UR
   expect(report).toContain('URL::useOrigin')
   expect(report).toContain('Stop Vite')
   expect(shareReport(shared({ state: 'broken', note: 'The page answered 500 through the tunnel.' }))).toContain('answered 500')
-  expect(shareReport(shared({}))).toBe(`Tunnel: ${TUNNEL} (links checked)`)
+  expect(shareReport(shared({}))).toBe(`Tunnel: ${TUNNEL} (links checked)\nA new tunnel can take about 20 seconds to resolve for the first visit.`)
   expect(shareReport(shared({ state: 'failed', url: null, note: 'cloudflared is not installed' }))).toBe('Tunnel failed: cloudflared is not installed')
   expect(shareReport(shared({ state: 'starting', url: null, note: 'building assets' }))).toBe('Tunnel is starting… (building assets)')
 })
@@ -603,30 +603,20 @@ test('the build runs with the lockfile package manager, and only when a build sc
   expect(buildArgv('not json', ['bun.lock'])).toBeNull()
 })
 
-test('a redirect is followed to an absolute or root-relative location only', () => {
-  expect(resolveLocation('/login', `${TUNNEL}/dashboard`)).toBe(`${TUNNEL}/login`)
-  expect(resolveLocation('https://other.example/x', TUNNEL)).toBe('https://other.example/x')
-  expect(resolveLocation('login', TUNNEL)).toBeNull()
-  expect(resolveLocation('//evil.example', TUNNEL)).toBeNull()
+test('a redirect is followed only while it stays on the tunnel or the local serve', () => {
+  const hosts = [HOST, '127.0.0.1:8100']
+
+  expect(localPath('/login', hosts)).toBe('/login')
+  expect(localPath(`${TUNNEL}/login?next=%2F`, hosts)).toBe('/login?next=%2F')
+  expect(localPath(`http://${HOST}`, hosts)).toBe('/')
+  expect(localPath('http://127.0.0.1:8100/auth', hosts)).toBe('/auth')
+  expect(localPath('https://accounts.example.com/oauth', hosts)).toBeNull()
+  expect(localPath('//elsewhere.example/x', hosts)).toBeNull()
+  expect(localPath('login', hosts)).toBeNull()
 })
 
-test('reads the status that curl writes after the body', () => {
-  expect(readCurl('<html></html>\n__artisan_dev_status__:200')).toEqual({ status: 200, text: '<html></html>' })
-  expect(readCurl('curl: (6) Could not resolve host')).toBeNull()
-})
-
-test('dig has answered only when it prints an address', () => {
-  expect(hasAddress('104.16.230.132\n104.16.231.132\n')).toBe(true)
-  expect(hasAddress('2606:4700::6810:e684\n')).toBe(true)
-  expect(hasAddress('')).toBe(false)
-  expect(hasAddress(';; connection timed out; no servers could be reached\n')).toBe(false)
-  expect(hasAddress('some.cname.example.\n')).toBe(false)
-})
-
-test('a tunnel that is not reachable yet answers with a gateway or Cloudflare status', () => {
-  expect(isTunnelWarming(530)).toBe(true)
-  expect(isTunnelWarming(502)).toBe(true)
-  expect(isTunnelWarming(200)).toBe(false)
-  expect(isTunnelWarming(500)).toBe(false)
-  expect(isTunnelWarming(404)).toBe(false)
+test('reads the status and redirect that curl writes after the body', () => {
+  expect(readCurl('<html></html>\n__artisan_dev_status__:200 ')).toEqual({ status: 200, text: '<html></html>', location: '' })
+  expect(readCurl(`\n__artisan_dev_status__:302 ${TUNNEL}/login`)).toEqual({ status: 302, text: '', location: `${TUNNEL}/login` })
+  expect(readCurl('curl: (7) Failed to connect')).toBeNull()
 })
