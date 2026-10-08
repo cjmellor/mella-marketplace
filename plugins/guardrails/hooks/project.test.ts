@@ -98,8 +98,8 @@ describe('fixers in a Laravel project', () => {
     expect(fixersFor(`${ROOT}/app/Models/User.php`, laravel)[0]?.argv).toEqual([`${ROOT}/vendor/bin/pint`, '--format', 'agent', `${ROOT}/app/Models/User.php`])
   })
 
-  test('a Blade file gets pint (laravel_blade) and sheath, not vp', () => {
-    expect(names(`${ROOT}/resources/views/welcome.blade.php`, laravel)).toEqual(['pint', 'sheath'])
+  test('a Blade file gets sheath fixes, then pint (laravel_blade) formats last, and no vp', () => {
+    expect(names(`${ROOT}/resources/views/welcome.blade.php`, laravel)).toEqual(['sheath', 'pint'])
     expect(names(`${ROOT}/resources/views/welcome.blade.php`, { ...laravel, pint: { notPaths: [], blade: false } })).toEqual(['sheath'])
   })
 

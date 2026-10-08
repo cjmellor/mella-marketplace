@@ -132,12 +132,12 @@ export function fixersFor(file: string, project: Project): Fixer[] {
     return fixers
   }
 
-  if (project.pint && PHP.test(file) && (!BLADE.test(file) || project.pint.blade) && !ignoredBy(project.pint.notPaths, rel)) {
-    fixers.push({ name: 'pint', argv: [`${project.root}/vendor/bin/pint`, '--format', 'agent', file] })
-  }
-
   if (project.sheath && BLADE.test(file)) {
     fixers.push({ name: 'sheath', argv: ['php', '-d', 'memory_limit=-1', 'artisan', 'sheath:lint', '--fix', file] })
+  }
+
+  if (project.pint && PHP.test(file) && (!BLADE.test(file) || project.pint.blade) && !ignoredBy(project.pint.notPaths, rel)) {
+    fixers.push({ name: 'pint', argv: [`${project.root}/vendor/bin/pint`, '--format', 'agent', file] })
   }
 
   const web = webFormatter(file, project)

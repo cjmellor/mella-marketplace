@@ -34,17 +34,17 @@ Refused, with a hint that names the right tool:
 
 After each Write or Edit, the formatter the project has set up runs on that one file. Claude is told what it changed, so it re-reads the file before its next edit.
 
-| File                         | Formatter                                   | When                                                                                                         |
-| ---------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `*.php`                      | Pint (`vendor/bin/pint --format agent`)     | `vendor/bin/pint` exists. Blade files only with `Pint/laravel_blade`. `notPath` in `pint.json` is respected. |
-| `*.blade.php`                | sheath (`artisan sheath:lint --fix`)        | `config/sheath.php` exists. What it cannot fix is passed to Claude.                                          |
-| JS, TS, CSS, JSON, Markdown  | `vp fmt`                                    | `vite.config.*` has a `fmt` block and `node_modules/.bin/vp` exists. `ignorePatterns` is respected.          |
-| JS, TS, CSS, JSON            | Biome                                       | `biome.json(c)` and `node_modules/.bin/biome` exist, and there is no `vp fmt`.                               |
-| JS, TS, CSS, Blade, Markdown | Prettier                                    | A Prettier config and `node_modules/.bin/prettier` exist, and there is no `vp fmt` or Biome.                 |
-| `*.go`                       | gofmt                                       | `go.mod` exists and `gofmt` is on the PATH.                                                                  |
-| `*.rs`                       | rustfmt, with the edition from `Cargo.toml` | `Cargo.toml` exists and `rustfmt` is on the PATH.                                                            |
-| `*.py`                       | Ruff, or Black                              | Ruff or Black is configured, and installed in `.venv` or on the PATH.                                        |
-| `*.swift`                    | swift-format                                | `.swift-format` exists and `swift-format` is on the PATH.                                                    |
+| File                         | Formatter                                   | When                                                                                                                           |
+| ---------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `*.php`                      | Pint (`vendor/bin/pint --format agent`)     | `vendor/bin/pint` exists. Blade files only with `Pint/laravel_blade`. `notPath` in `pint.json` is respected.                   |
+| `*.blade.php`                | sheath (`artisan sheath:lint --fix`)        | `config/sheath.php` exists. Runs before Pint, so Pint formats last. Only safe fixes are applied; the rest is passed to Claude. |
+| JS, TS, CSS, JSON, Markdown  | `vp fmt`                                    | `vite.config.*` has a `fmt` block and `node_modules/.bin/vp` exists. `ignorePatterns` is respected.                            |
+| JS, TS, CSS, JSON            | Biome                                       | `biome.json(c)` and `node_modules/.bin/biome` exist, and there is no `vp fmt`.                                                 |
+| JS, TS, CSS, Blade, Markdown | Prettier                                    | A Prettier config and `node_modules/.bin/prettier` exist, and there is no `vp fmt` or Biome.                                   |
+| `*.go`                       | gofmt                                       | `go.mod` exists and `gofmt` is on the PATH.                                                                                    |
+| `*.rs`                       | rustfmt, with the edition from `Cargo.toml` | `Cargo.toml` exists and `rustfmt` is on the PATH.                                                                              |
+| `*.py`                       | Ruff, or Black                              | Ruff or Black is configured, and installed in `.venv` or on the PATH.                                                          |
+| `*.swift`                    | swift-format                                | `.swift-format` exists and `swift-format` is on the PATH.                                                                      |
 
 Files in `vendor`, `node_modules`, `target`, `.venv`, `build` and `dist` are never formatted. Linters, static analysis and tests never run per edit: they are too slow and work on the whole project.
 
