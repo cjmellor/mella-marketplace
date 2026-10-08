@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.22.0] - 2026-10-08
+
+### Added
+
+- **`guardrails`, a mod that enforces your rules on the tool calls themselves** (guardrails → v0.1.0). `git push`, `gh pr create`/`ready` and `gh pr merge` run only when your last typed prompt asked for them, and a raw `git commit` runs only while a commit skill is active. Bash commands your CLI rules forbid (CI polling, `grep`, `find`, `sed -i`, and scripts or heredocs that write project files) are refused with a hint naming the right tool. Each edited file runs through the formatter the project has set up (Pint, sheath, `vp fmt`, Biome, Prettier, gofmt, rustfmt, Ruff or Black, swift-format), and the package manager, Pint and artisan command rules are applied. Every rule switches on from what the project contains, never its name, and each part has its own switch in `/config`.
+
+### Changed
+
+- **The `commit` skill no longer runs Pint** (mella → v1.16.3). `guardrails` formats each file as Claude edits it.
+
 ## [1.21.0] - 2026-10-07
 
 ### Added

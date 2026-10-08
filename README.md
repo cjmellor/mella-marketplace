@@ -14,7 +14,7 @@ Productivity tools to streamline your development workflow.
 
 | Skill | Description | Triggers when... |
 |-------|-------------|------------------|
-| `commit` | Create git commits with automatic logical grouping, push (`push`), and PR creation (`pr`, `draft`). Runs on a cheaper model, and runs Laravel Pint automatically if available. | You invoke `/mella:commit` |
+| `commit` | Create git commits with automatic logical grouping, push (`push`), and PR creation (`pr`, `draft`). Runs on a cheaper model. | You invoke `/mella:commit` |
 | `walkthrough` | Auto-generates step-by-step testing guides for features and bug fixes. Runs in an isolated context. | You ask Claude to "write a walkthrough", "create testing steps", or generate QA documentation |
 | `pitch` | Deep-dive codebase analysis that generates innovative ideas one at a time. Pass a count and brief inline: `/pitch [N] [brief]`. Cheap sub-agents handle codebase and competitor research (with a cited feature matrix); accepted ideas land in a `PITCHES.md` handover dossier with a cross-run ledger. | You invoke `/mella:pitch`, or ask "what should I build next?", "pitch me ideas", "suggest features" |
 | `review-bot` | Triage GitHub bot review comments on PRs: re-reviews each comment against the actual code, applies valid fixes, dismisses false positives, and posts a summary comment on the PR. | You invoke `/mella:review-bot`, or say "handle the bot review", "triage bot comments on PR #N" |
@@ -36,8 +36,9 @@ Mods are plugins that put live UI inside Claude Code: a band above the prompt, a
 | `session-stats` | Shows the model, reasoning effort, context fill and rate-limit usage above the prompt, so you can drop a `statusline` script for them. The pane breaks the context window down. | `/session-stats`, or the `+` button on the band |
 | `artisan-dev` | Runs a Laravel app's `php artisan dev` from inside the session: per-process logs, restart and stop controls, a port override, the site link, a public tunnel whose links it checks, and server state you can attach to your next prompt. | `/dev` |
 | `worktree-ready` | Makes a new git worktree of a Laravel app ready with no hands: copy-on-write clones of `vendor`, `node_modules` and built assets, a Valet or Herd HTTPS site for it, and clean-up when Claude leaves the worktree. | Runs on its own when Claude enters or exits a worktree |
+| `guardrails` | Stops pushes, PRs and raw commits you did not ask for, refuses Bash commands your CLI rules forbid (CI polling, `grep`, `find`, `sed -i`, scripts that edit files), and runs the project's own formatter on each file Claude edits. Works in any project. | Runs on its own; each part has a switch in `/config` |
 
-See each mod's README for details: [`git-diff`](plugins/git-diff/README.md), [`session-stats`](plugins/session-stats/README.md), [`artisan-dev`](plugins/artisan-dev/README.md), [`worktree-ready`](plugins/worktree-ready/README.md).
+See each mod's README for details: [`git-diff`](plugins/git-diff/README.md), [`session-stats`](plugins/session-stats/README.md), [`artisan-dev`](plugins/artisan-dev/README.md), [`worktree-ready`](plugins/worktree-ready/README.md), [`guardrails`](plugins/guardrails/README.md).
 
 ## Installation
 
