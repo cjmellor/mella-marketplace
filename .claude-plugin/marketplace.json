@@ -6,14 +6,14 @@
   },
   "metadata": {
     "description": "Mella's curated marketplace of Claude Code plugins",
-    "version": "1.21.0"
+    "version": "1.22.0"
   },
   "plugins": [
     {
       "name": "mella",
       "source": "./plugins/mella",
       "description": "Mella's collection of productivity tools for Claude Code",
-      "version": "1.16.2",
+      "version": "1.16.3",
       "keywords": ["testing", "walkthrough", "documentation", "qa", "code-review", "review", "review-bot", "pitch", "ideation", "worktree", "provisioning"],
       "license": "MIT"
     },
@@ -55,6 +55,14 @@
       "description": "Makes a new git worktree of a Laravel app ready with no hands: copy-on-write clones of vendor, node_modules and built assets, a Valet or Herd HTTPS site, and clean-up when you leave.",
       "version": "0.1.1",
       "keywords": ["laravel", "worktree", "valet", "herd", "mod", "copy-on-write"],
+      "license": "MIT"
+    },
+    {
+      "name": "guardrails",
+      "source": "./plugins/guardrails",
+      "description": "A mod that stops pushes, PRs and raw commits you did not ask for, steers Bash to the right tools, and runs the project's own formatter on each file Claude edits.",
+      "version": "0.1.0",
+      "keywords": ["git", "guard", "formatter", "pint", "mod"],
       "license": "MIT"
     }
   ]
