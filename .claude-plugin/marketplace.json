@@ -56,6 +56,14 @@
       "version": "0.1.1",
       "keywords": ["laravel", "worktree", "valet", "herd", "mod", "copy-on-write"],
       "license": "MIT"
+    },
+    {
+      "name": "guardrails",
+      "source": "./plugins/guardrails",
+      "description": "A mod that stops pushes, PRs and raw commits you did not ask for, steers Bash to the right tools, and runs the project's own formatter on each file Claude edits.",
+      "version": "0.1.0",
+      "keywords": ["git", "guard", "formatter", "pint", "mod"],
+      "license": "MIT"
     }
   ]
 }

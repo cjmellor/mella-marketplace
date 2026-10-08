@@ -1,0 +1,29 @@
+{
+  "name": "guardrails",
+  "version": "0.1.0",
+  "description": "Stops pushes, PRs and raw commits you did not ask for, steers Bash to the right tools, and runs each project's own formatter on the file Claude just edited.",
+  "author": { "name": "Chris Mellor" },
+  "keywords": ["git", "guard", "pint", "formatter", "mod", "laravel"],
+  "license": "MIT",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "git": {
+      "type": "boolean",
+      "title": "Git guard",
+      "description": "Stop git push, gh pr create/ready/merge unless your last message asked for it, and raw git commit outside the commit skill.",
+      "default": true
+    },
+    "shell": {
+      "type": "boolean",
+      "title": "Shell guard",
+      "description": "Stop Bash commands your CLI rules forbid (CI polling, sed -i, grep, find) and scripts that write files instead of using Edit or Write.",
+      "default": true
+    },
+    "project": {
+      "type": "boolean",
+      "title": "Project tools",
+      "description": "Run the project's formatter (Pint, sheath, vp fmt, Prettier) on each edited file, and apply its command rules (bun, Valet, artisan --no-interaction).",
+      "default": true
+    }
+  }
+}

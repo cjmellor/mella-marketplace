@@ -5,13 +5,6 @@ argument-hint: "[pr] [draft] [push [branch]]"
 allowed-tools: [Bash, Read, Grep, Glob]
 model: claude-sonnet-5
 effort: low
-hooks:
-  PreToolUse:
-    - matcher: "Bash"
-      hooks:
-        - type: command
-          command: "[ -f vendor/bin/pint ] && vendor/bin/pint --dirty || true"
-          once: true
 ---
 
 # Commit Command
