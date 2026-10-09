@@ -17,7 +17,7 @@ export const RULES: readonly Rule[] = [
   { when: /\bgh\s+run\s+watch\b/, hint: 'Do not poll CI from Bash. Use the Monitor tool (load it with ToolSearch).' },
   { when: /\bgh\s+pr\s+checks\b[^|;&\n]*--watch\b/, hint: 'Do not poll CI from Bash. Use the Monitor tool (load it with ToolSearch).' },
   { when: /\b(?:while|until)\b[\s\S]*\bsleep\b/, hint: 'Do not poll with sleep loops. Use the Monitor tool with an until-loop command.' },
-  { when: /\bsed\b[^|;&\n]*\s(?:-[a-zA-Z]*i\S*|--in-place\S*)(?:\s|$)/, hint: 'Edit files with the Edit tool.' },
+  { when: new RegExp(`${STARTS}sed\\b[^|;&\\n]*\\s(?:-[a-zA-Z]*i\\S*|--in-place\\S*)(?:\\s|$)`), hint: 'Edit files with the Edit tool.' },
   { when: new RegExp(`${STARTS}grep\\b`), hint: 'Use rg instead of grep.' },
   { when: new RegExp(`${STARTS}find\\s`), hint: 'Use fd instead of find.' },
   { when: /\bgh\s+run\s+view\b(?![^|;&\n]*>)[^|;&\n]*--log-failed\b(?![^|;&\n]*>)/, hint: 'Write the failed log to a file and read the part you need.' },
