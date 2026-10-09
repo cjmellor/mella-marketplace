@@ -26,9 +26,9 @@ guardrails is a Claude Code mod. It works in any project: every rule switches on
 Refused, with a hint that names the right tool:
 
 - CI polling: `gh run watch`, `gh pr checks --watch`, and `while`/`until` loops around `sleep`. Use the Monitor tool.
-- `sed -i` (use `sd` or the Edit tool), `grep` (use `rg`), `find` (use `fd`).
+- `grep` (use `rg`), `find` (use `fd`).
 - `gh run view --log-failed` that is not written to a file.
-- File edits from Bash: `perl -pi` and `ruby -i`, `cat` or `tee` heredocs into a file, and Python, Node, Ruby, Perl or PHP scripts, inline or saved to a file, that write to a path inside the project. Scripts that only read, or write outside the project (such as `/tmp`), still run.
+- File edits from Bash, which belong to the Edit or Write tool: `sed -i`, `perl -pi` and `ruby -i`, `sd` given files (directly or through `xargs`), `cat` or `tee` heredocs into a file, and Python, Node, Ruby, Perl or PHP scripts, inline or saved to a file, that write to a path inside the project. `sd` on piped text and `sd -p` previews still run, as do scripts that only read or write outside the project (such as `/tmp`).
 
 ## Project tools
 

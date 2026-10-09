@@ -14,10 +14,10 @@ describe('CLI rules', () => {
     ['gh pr checks 12 --watch', 'Monitor'],
     ['while ! gh run view 1 --json status | rg -q completed; do sleep 10; done', 'Monitor'],
     ['until curl -sf localhost:8000; do sleep 2; done', 'Monitor'],
-    ["sed -i '' 's/a/b/' app/User.php", 'sd'],
-    ["sed -i.bak 's/a/b/' x", 'sd'],
-    ["sed -E -i 's/a/b/' x", 'sd'],
-    ['sed --in-place s/a/b/ x', 'sd'],
+    ["sed -i '' 's/a/b/' app/User.php", 'Edit tool'],
+    ["sed -i.bak 's/a/b/' x", 'Edit tool'],
+    ["sed -E -i 's/a/b/' x", 'Edit tool'],
+    ['sed --in-place s/a/b/ x', 'Edit tool'],
     ['grep -rn foo app', 'rg'],
     ['git diff | grep foo', 'rg'],
     ['find . -name "*.php"', 'fd'],
@@ -35,7 +35,6 @@ describe('CLI rules', () => {
     'rg -n foo app',
     'fd -e php . app',
     "sed -n '1,20p' app/User.php",
-    "sd 'a' 'b' app/User.php",
     'git grep -n foo',
     'pgrep -f php',
     'rg "find me" docs',
@@ -43,6 +42,39 @@ describe('CLI rules', () => {
     'gh run view 123 --log-failed > /tmp/ci.log',
     'gh run view 123',
     'sleep 2 && curl -s localhost:8000',
+  ]
+
+  for (const command of allowed) {
+    test(`allows ${JSON.stringify(command)}`, () => {
+      expect(shellDenial(command)).toBeUndefined()
+    })
+  }
+})
+
+describe('sd file edits', () => {
+  const denied = [
+    "sd 'a' 'b' app/User.php",
+    "sd -F '[x]' 'y' app/User.php resources/js/app.js",
+    'sd -n 1 foo bar app/User.php',
+    "cd app && sd 'a' 'b' User.php",
+    'rg -l foo | xargs sd foo bar',
+  ]
+
+  for (const command of denied) {
+    test(`denies ${JSON.stringify(command)}`, () => {
+      expect(shellDenial(command)).toContain('Edit tool')
+    })
+  }
+
+  const allowed = [
+    "echo foo | sd 'foo' 'bar'",
+    "git log --oneline | sd -F '#' ''",
+    "sd 'a' 'b' < app/User.php > /tmp/out",
+    "sd -p 'a' 'b' app/User.php",
+    "sd --preview 'a' 'b' app/User.php",
+    "sd -Fp '[x]' 'y' app/User.php",
+    'rg -n sd docs',
+    'echo sd a b c',
   ]
 
   for (const command of allowed) {
