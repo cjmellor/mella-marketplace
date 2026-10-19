@@ -83,7 +83,22 @@ export const parseWorktree = (revParse: string): WorktreeInfo | null => {
 
 export const basename = (path: string): string => path.split('/').filter(Boolean).pop() ?? path
 
-export const underWorktrees = (main: string, path: string): boolean => path.startsWith(`${main}/.claude/worktrees/`)
+export type WorktreeLock = { kind: 'none' } | { kind: 'session'; pid: number } | { kind: 'other' }
+
+export const lockOf = (porcelain: string, path: string): WorktreeLock => {
+  const block = porcelain.split('\n\n').find(entry => entry.split('\n')[0] === `worktree ${path}`)
+  const locked = block?.split('\n').find(line => line === 'locked' || line.startsWith('locked '))
+
+  if (locked === undefined) {
+    return { kind: 'none' }
+  }
+
+  const pid = /^locked claude session .*\(pid (\d+)\b/.exec(locked)?.[1]
+
+  return pid ? { kind: 'session', pid: Number(pid) } : { kind: 'other' }
+}
+
+export const underWorktrees =(main: string, path: string): boolean => path.startsWith(`${main}/.claude/worktrees/`)
 
 export const chooseTool = (
   configured: string,

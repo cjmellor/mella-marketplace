@@ -1,6 +1,20 @@
 import { expect, test } from 'claude-code/testing'
 
-import { certBase, chooseTool, jsPlan, linkName, parseLinks, parseWorktree, setEnv, shareSqlite, underWorktrees } from './lib'
+import { certBase, chooseTool, jsPlan, linkName, lockOf, parseLinks, parseWorktree, setEnv, shareSqlite, underWorktrees } from './lib'
+
+test('reads who holds a worktree lock from git worktree list --porcelain', () => {
+  const list = [
+    'worktree /m/acme\nHEAD a\nbranch refs/heads/main',
+    'worktree /m/acme/.claude/worktrees/heron\nHEAD b\nbranch refs/heads/worktree-heron\nlocked claude session heron (pid 20388 start Mon Oct 19 19:58:21 2026)',
+    'worktree /m/acme/.claude/worktrees/owl\nHEAD c\nlocked',
+    'worktree /m/acme/.claude/worktrees/fox\nHEAD d\nlocked on a USB stick',
+  ].join('\n\n')
+
+  expect(lockOf(list, '/m/acme/.claude/worktrees/heron')).toEqual({ kind: 'session', pid: 20388 })
+  expect(lockOf(list, '/m/acme/.claude/worktrees/owl')).toEqual({ kind: 'other' })
+  expect(lockOf(list, '/m/acme/.claude/worktrees/fox')).toEqual({ kind: 'other' })
+  expect(lockOf(list, '/m/acme')).toEqual({ kind: 'none' })
+})
 
 test('finds the site certificate where Valet or Herd keeps it', () => {
   expect(certBase('valet', '/u', 'acme-wt.test')).toBe('/u/.config/valet/Certificates/acme-wt.test')

@@ -22,6 +22,9 @@ type World = {
   sameAssets: boolean
   dirty: boolean
   merged: boolean
+  mergedPrHeads: string[]
+  lock: string | null
+  lockHolderAlive: boolean
   head: string
   statusFails: boolean
   locked: boolean
@@ -54,6 +57,9 @@ const world = (overrides: Partial<World> = {}): World => ({
   sameAssets: true,
   dirty: false,
   merged: true,
+  mergedPrHeads: [],
+  lock: null,
+  lockHolderAlive: false,
   head: 'abc123',
   statusFails: false,
   locked: false,
@@ -90,7 +96,17 @@ const respond = (w: World, argv: string[], cwd: string | undefined) => {
   if (line === 'git status --porcelain') return w.statusFails ? fail() : ok(w.dirty ? ' M app/User.php\n' : '')
   if (line.startsWith('git -C') && line.includes('symbolic-ref')) return ok('origin/main\n')
   if (line.includes('merge-base --is-ancestor')) return w.merged ? ok() : fail()
+  if (line.startsWith('gh pr list --head worktree-blue-heron --state merged')) return ok(JSON.stringify(w.mergedPrHeads.map(headRefOid => ({ headRefOid }))))
+  if (line === `git -C ${MAIN} worktree list --porcelain`) return ok(`worktree ${MAIN}\nHEAD a\n\nworktree ${TREE}\nHEAD b${w.lock ? `\n${w.lock}` : ''}\n`)
+  if (line.startsWith('kill -0 ')) return w.lockHolderAlive ? ok() : fail()
+  if (line === `git -C ${MAIN} worktree unlock ${TREE}`) {
+    w.lock = null
+
+    return ok()
+  }
   if (line.includes('worktree remove')) {
+    if (w.lock) return fail()
+
     w.files.delete(TREE)
 
     return ok()
@@ -152,6 +168,7 @@ const stubWorld = (on: (name: string, hook: (...args: any[]) => unknown) => void
   })
   on('session.cwd', () => ({ value: w.cwd }))
   on('session.repo', () => ({ value: { root: MAIN, remote: null, internal: false } }))
+  on('session.end', ($: unknown, e: { sessionId: string }) => ({ sessionId: e.sessionId }))
 }
 
 const enter = (w: World) => () => {
@@ -297,6 +314,102 @@ test('a worktree whose branch is not merged is kept', async ($, on) => {
 
   expect(ran(w, `git -C ${MAIN} worktree remove`)).toEqual([])
   expect(w.toasts.some(text => text.includes('not merged'))).toBe(true)
+})
+
+test('a worktree whose branch was squash-merged through a PR at its current commit is removed', async ($, on) => {
+  const w = world({ merged: false, mergedPrHeads: ['def456'] })
+
+  stubWorld(on, w)
+  on('tool.call', ($: unknown, e: { tool: string }) => (e.tool === 'EnterWorktree' ? enter(w)() : leave('keep')()))
+  await $.tool.call({ tool: 'EnterWorktree', name: 'blue-heron' })
+  w.head = 'def456'
+  await $.tool.call({ tool: 'ExitWorktree', action: 'keep' })
+
+  expect(ran(w, `git -C ${MAIN} worktree remove`)).toEqual([`git -C ${MAIN} worktree remove ${TREE}`])
+  expect(w.store.has(`wt:${TREE}`)).toBe(false)
+})
+
+test('a worktree with commits after its merged PR is kept', async ($, on) => {
+  const w = world({ merged: false, mergedPrHeads: ['abc999'], head: 'def456' })
+
+  stubWorld(on, w)
+  on('tool.call', ($: unknown, e: { tool: string }) => (e.tool === 'EnterWorktree' ? enter(w)() : leave('keep')()))
+  await $.tool.call({ tool: 'EnterWorktree', name: 'blue-heron' })
+  await $.tool.call({ tool: 'ExitWorktree', action: 'keep' })
+
+  expect(ran(w, `git -C ${MAIN} worktree remove`)).toEqual([])
+  expect(w.toasts.some(text => text.includes('not merged'))).toBe(true)
+})
+
+test('a session that ends inside its worktree leaves it for the next session to remove', async ($, on) => {
+  const w = world()
+  const clock = mock.clock(on)
+
+  stubWorld(on, w)
+  on('tool.call', enter(w))
+  on('session.start', () => ({ cwd: MAIN }))
+  await $.tool.call({ tool: 'EnterWorktree', name: 'blue-heron' })
+  w.head = 'def456'
+  w.cwd = `${TREE}/app`
+  w.calls.length = 0
+  await $.session.end({ reason: 'other', sessionId: 's1', resume: { id: 's1' } })
+
+  expect(w.calls).toEqual([])
+  expect(w.store.get(`wt:${TREE}`)).toMatchObject({ state: 'exited', link: NAME })
+
+  w.cwd = MAIN
+  await $.session.start({ surface: 'terminal', isInteractive: true, cwd: MAIN })
+  await clock.advance(1)
+
+  expect(w.sites.some(site => site.name === NAME)).toBe(false)
+  expect(ran(w, `git -C ${MAIN} worktree remove`)).toEqual([`git -C ${MAIN} worktree remove ${TREE}`])
+  expect(w.store.has(`wt:${TREE}`)).toBe(false)
+})
+
+test('a lock left by a Claude session that has died is released before removal', async ($, on) => {
+  const w = world({ lock: 'locked claude session blue-heron (pid 4242 start Mon Oct 19 19:58:21 2026)' })
+
+  stubWorld(on, w)
+  on('tool.call', ($: unknown, e: { tool: string }) => (e.tool === 'EnterWorktree' ? enter(w)() : leave('keep')()))
+  await $.tool.call({ tool: 'EnterWorktree', name: 'blue-heron' })
+  w.head = 'def456'
+  await $.tool.call({ tool: 'ExitWorktree', action: 'keep' })
+
+  expect(ran(w, `git -C ${MAIN} worktree unlock`)).toEqual([`git -C ${MAIN} worktree unlock ${TREE}`])
+  expect(ran(w, `git -C ${MAIN} worktree remove`)).toEqual([`git -C ${MAIN} worktree remove ${TREE}`])
+  expect(w.store.has(`wt:${TREE}`)).toBe(false)
+})
+
+test('a worktree locked by a running session, or by anything else, is kept', async ($, on) => {
+  const w = world({ lock: 'locked claude session blue-heron (pid 4242 start Mon Oct 19 19:58:21 2026)', lockHolderAlive: true })
+
+  stubWorld(on, w)
+  on('tool.call', ($: unknown, e: { tool: string }) => (e.tool === 'EnterWorktree' ? enter(w)() : leave('keep')()))
+  await $.tool.call({ tool: 'EnterWorktree', name: 'blue-heron' })
+  w.head = 'def456'
+  await $.tool.call({ tool: 'ExitWorktree', action: 'keep' })
+
+  expect(ran(w, `git -C ${MAIN} worktree unlock`)).toEqual([])
+  expect(ran(w, `git -C ${MAIN} worktree remove`)).toEqual([])
+  expect(w.toasts.some(text => text.includes('running session'))).toBe(true)
+
+  w.lock = 'locked'
+  w.lockHolderAlive = false
+  await $.tool.call({ tool: 'ExitWorktree', action: 'keep' })
+
+  expect(ran(w, `git -C ${MAIN} worktree remove`)).toEqual([])
+})
+
+test('a /clear leaves the worktree active', async ($, on) => {
+  const w = world()
+
+  stubWorld(on, w)
+  on('tool.call', enter(w))
+  await $.tool.call({ tool: 'EnterWorktree', name: 'blue-heron' })
+  w.cwd = TREE
+  await $.session.end({ reason: 'clear', sessionId: 's1', resume: { id: 's1' } })
+
+  expect(w.store.get(`wt:${TREE}`)).toMatchObject({ state: 'active' })
 })
 
 test('a worktree entered and left without a commit is kept, even though main contains its branch', async ($, on) => {

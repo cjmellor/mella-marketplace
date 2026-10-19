@@ -1,6 +1,6 @@
 import type { EngineInterface, Register } from 'claude-code'
 
-import { ASSET_INPUTS, CLONES, JS_LOCK_FILES, TOOLS, basename, certBase, chooseTool, jsPlan, linkName, parseLinks, parseWorktree, setEnv, shareSqlite, underWorktrees } from './lib'
+import { ASSET_INPUTS, CLONES, JS_LOCK_FILES, TOOLS, basename, certBase, chooseTool, jsPlan, linkName, lockOf, parseLinks, parseWorktree, setEnv, shareSqlite, underWorktrees } from './lib'
 import type { Link, Tool, WorktreeInfo, WorktreeRecord } from './lib'
 
 const PLUGIN = 'worktree-ready'
@@ -346,6 +346,40 @@ async function isMerged($: EngineInterface, record: WorktreeRecord): Promise<boo
     }
   }
 
+  return prMerged($, record, head.stdout.trim())
+}
+
+async function prMerged($: EngineInterface, record: WorktreeRecord, head: string): Promise<boolean> {
+  const listed = await run($, ['gh', 'pr', 'list', '--head', record.branch, '--state', 'merged', '--json', 'headRefOid'], record.main, SITE_MS)
+
+  if (!passed(listed)) {
+    return false
+  }
+
+  try {
+    return (JSON.parse(listed.stdout) as { headRefOid?: string }[]).some(pr => pr.headRefOid === head)
+  } catch {
+    return false
+  }
+}
+
+async function unlocked($: EngineInterface, record: WorktreeRecord): Promise<boolean> {
+  const listed = await run($, ['git', '-C', record.main, 'worktree', 'list', '--porcelain'])
+  const lock = passed(listed) ? lockOf(listed.stdout, record.path) : { kind: 'other' as const }
+
+  if (lock.kind === 'none') {
+    return true
+  }
+
+  if (lock.kind === 'session' && !passed(await run($, ['kill', '-0', String(lock.pid)]))) {
+    return passed(await run($, ['git', '-C', record.main, 'worktree', 'unlock', record.path]))
+  }
+
+  if (!record.notified) {
+    toast($, `${basename(record.path)} was kept: ${lock.kind === 'session' ? 'a running session still holds it' : 'it is locked'}`, 10_000)
+    await saveRecord($, { ...record, notified: true })
+  }
+
   return false
 }
 
@@ -373,6 +407,10 @@ async function tryRemove($: EngineInterface, record: WorktreeRecord) {
       await saveRecord($, { ...record, notified: true })
     }
 
+    return
+  }
+
+  if (!(await unlocked($, record))) {
     return
   }
 
@@ -410,6 +448,18 @@ async function retire($: EngineInterface, top: string, removedByTool: boolean) {
   await tryRemove($, exited)
 }
 
+async function markExited($: EngineInterface) {
+  const here = await $.session.cwd()
+
+  for (const key of (await $.store.keys()).filter(key => key.startsWith(PREFIX))) {
+    const record = (await $.store.get(key)) as WorktreeRecord | undefined
+
+    if (record?.state === 'active' && (here === record.path || here.startsWith(`${record.path}/`))) {
+      await saveRecord($, { ...record, state: 'exited' })
+    }
+  }
+}
+
 async function sweep($: EngineInterface) {
   const main = (await $.session.repo().catch(() => null))?.root
   const here = await $.session.cwd()
@@ -440,6 +490,15 @@ export const register: Register = (on, options) => {
     $.clock.after(0, () => {
       void sweep($).catch(() => undefined)
     })
+
+    return next(e)
+  })
+
+  // session.end has about 1.5 s for every hook, too short for unlinking or `git worktree remove`; the next session's sweep does those.
+  on('session.end', async ($, e, next) => {
+    if (e.reason !== 'clear') {
+      await markExited($).catch(() => undefined)
+    }
 
     return next(e)
   })

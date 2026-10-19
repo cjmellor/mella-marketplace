@@ -29,7 +29,9 @@ A worktree that a session starts in (`claude --worktree`) is set up the same way
 
 Whether the exit keeps or removes the worktree, the site is unsecured and unlinked, and the mod checks that it is gone from `links`.
 
-If the exit kept the worktree, the mod then removes the folder and its branch when there is nothing to lose: no uncommitted changes, and the branch has commits of its own that are merged into the default branch. A worktree you entered and left without committing is kept. Anything else is kept, and you are told why once. The same check runs for leftovers at the start of the next session, along with the links of worktrees whose folder no longer exists. Only worktrees under the project's `.claude/worktrees/` that the mod set up are ever removed.
+If the exit kept the worktree, the mod then removes the folder and its branch when there is nothing to lose: no uncommitted changes, and the branch has commits of its own that are merged into the default branch, or a merged PR (found with `gh`) whose head is the worktree's current commit, which covers squash merges. A worktree you entered and left without committing is kept. A worktree still locked by a running Claude session, or locked by anything other than Claude, is kept; a lock left by a Claude session that is no longer running is released. Anything else is kept, and you are told why once.
+
+A session that ends while it is inside a worktree (you exit, or the process is stopped) marks it exited, but the time a session has to end is too short to unlink or remove anything. The same check runs for those, and other leftovers, at the start of the next session in the project, along with the links of worktrees whose folder no longer exists. Only worktrees under the project's `.claude/worktrees/` that the mod set up are ever removed.
 
 ## Options
 
@@ -39,8 +41,8 @@ If the exit kept the worktree, the mod then removes the folder and its branch wh
 
 ## Limits
 
-- A worktree whose branch was squash-merged is reported as not merged, because its commits are not in the default branch's history. It stays until you remove it.
-- A session that ends without exiting the worktree leaves it marked active, so it is kept.
+- A worktree whose branch was squash-merged without a PR, or with `gh` missing or signed out, is reported as not merged. It stays until you remove it.
+- A session that is killed outright (SIGKILL, a crash) never ends cleanly, so its worktree stays marked active and is kept.
 - Herd's `links` output is assumed to match Valet's table. It has not been tried.
 - The whole flow was tested against a faked machine. It has not run against a real Herd.
 
