@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.23.0] - 2026-10-21
+
+### Added
+
+- **`worktree-ready` cleans up after sessions that end inside a worktree** (worktree-ready → v0.2.0). Exiting a session, or stopping its process, while it is in a worktree marks the worktree exited, and the next session in the project unlinks its site and removes it once the work is merged, as leaving with `ExitWorktree` does. A merged PR whose head is the worktree's current commit now counts as merged, so squash-merged branches are removed too (needs `gh`). The lock a finished Claude session leaves on its worktree, which made `git worktree remove` refuse, is released; a worktree held by a running session, or locked by anything else, is kept.
+
 ## [1.22.0] - 2026-10-08
 
 ### Added
