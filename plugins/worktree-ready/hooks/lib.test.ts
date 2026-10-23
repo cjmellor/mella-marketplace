@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { certBase, chooseTool, jsPlan, linkName, lockOf, parseLinks, parseWorktree, setEnv, shareSqlite, underWorktrees } from './lib'
+import { certBase, chooseTool, inWorktrees, isProxy, jsPlan, linkName, lockOf, parseLinks, parseSiteScan, parseWorktree, setEnv, shareSqlite, siteFiles, siteLink, underWorktrees } from './lib'
 
 test('reads who holds a worktree lock from git worktree list --porcelain', () => {
   const list = [
@@ -19,6 +19,30 @@ test('reads who holds a worktree lock from git worktree list --porcelain', () =>
 test('finds the site certificate where Valet or Herd keeps it', () => {
   expect(certBase('valet', '/u', 'acme-wt.test')).toBe('/u/.config/valet/Certificates/acme-wt.test')
   expect(certBase('herd', '/u', 'acme-wt.test')).toBe('/u/Library/Application Support/Herd/config/valet/Certificates/acme-wt.test')
+})
+
+test('lists every file Valet or Herd keeps for a site, and tells a proxy config from a plain site', () => {
+  expect(siteFiles('valet', '/u', 'acme-wt.test')).toEqual({
+    nginx: '/u/.config/valet/Nginx/acme-wt.test',
+    certs: ['crt', 'key', 'csr', 'conf'].map(extension => `/u/.config/valet/Certificates/acme-wt.test.${extension}`),
+  })
+  expect(siteFiles('herd', '/u', 'acme-wt.test').nginx).toBe('/u/Library/Application Support/Herd/config/valet/Nginx/acme-wt.test')
+  expect(isProxy('location / {\n  proxy_pass http://127.0.0.1:8095;\n}')).toBe(true)
+  expect(isProxy('location / {\n  rewrite ^ /server.php last;\n}')).toBe(false)
+})
+
+test('reads the site symlinks Valet hides once their folder is gone', () => {
+  expect(parseSiteScan('acme\t/m/acme\nacme-ghost\t/m/acme/.claude/worktrees/ghost\n')).toEqual([
+    { name: 'acme', path: '/m/acme' },
+    { name: 'acme-ghost', path: '/m/acme/.claude/worktrees/ghost' },
+  ])
+  expect(parseSiteScan('')).toEqual([])
+  expect(siteLink('valet', '/u', 'acme-ghost')).toBe('/u/.config/valet/Sites/acme-ghost')
+})
+
+test('only paths under a .claude/worktrees folder count as worktree sites', () => {
+  expect(inWorktrees('/m/acme/.claude/worktrees/heron')).toBe(true)
+  expect(inWorktrees('/m/acme')).toBe(false)
 })
 
 const LINKS = [

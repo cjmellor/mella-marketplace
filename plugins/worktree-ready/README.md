@@ -27,11 +27,13 @@ A worktree that a session starts in (`claude --worktree`) is set up the same way
 
 ## What happens when it is exited
 
-Whether the exit keeps or removes the worktree, the site is unsecured and unlinked, and the mod checks that it is gone from `links`.
+Whether the exit keeps or removes the worktree, the site is unsecured and unlinked, and the mod checks that it is gone: from `links`, from the `Sites` folder, and that no nginx config or certificate for it is left. Leftover files are deleted and checked again, except an nginx config that proxies (a `valet proxy` of the same name is never touched). A site that cannot be fully removed is reported, and its worktree is kept until a later session can finish the job.
 
-If the exit kept the worktree, the mod then removes the folder and its branch when there is nothing to lose: no uncommitted changes, and the branch has commits of its own that are merged into the default branch, or a merged PR (found with `gh`) whose head is the worktree's current commit, which covers squash merges. A worktree you entered and left without committing is kept. A worktree still locked by a running Claude session, or locked by anything other than Claude, is kept; a lock left by a Claude session that is no longer running is released. Anything else is kept, and you are told why once.
+If the exit kept the worktree, the mod then removes the folder (checking that it is gone) and its branch when there is nothing to lose: no uncommitted changes, and the branch has commits of its own that are merged into the default branch, or a merged PR (found with `gh`) whose head is the worktree's current commit, which covers squash merges. A worktree on a detached HEAD counts as merged when its commit is in the default branch; it has no branch to delete. A worktree you entered and left without committing is kept. A worktree still locked by a running Claude session, or locked by anything other than Claude, is kept; a lock left by a Claude session that is no longer running is released. Anything else is kept, and you are told why once.
 
-A session that ends while it is inside a worktree (you exit, or the process is stopped) marks it exited, but the time a session has to end is too short to unlink or remove anything. The same check runs for those, and other leftovers, at the start of the next session in the project, along with the links of worktrees whose folder no longer exists. Only worktrees under the project's `.claude/worktrees/` that the mod set up are ever removed.
+A session that ends while it is inside a worktree (you exit, or the process is stopped) marks it exited, but the time a session has to end is too short to unlink or remove anything. The same check runs for those, and other leftovers, at the start of the next session in any project, not only the one the worktree belongs to. A worktree still marked active whose Claude session has died (a lock naming a process that no longer runs) is treated the same way; one whose session is running is left alone.
+
+Valet's `links` hides a site once its folder is gone, so the same start-of-session pass also reads the `Sites` folder and removes every site that points under a `.claude/worktrees/` folder that no longer exists, whether or not the mod set it up. Only worktrees under a project's `.claude/worktrees/` that the mod set up are ever removed.
 
 ## Options
 
@@ -42,7 +44,8 @@ A session that ends while it is inside a worktree (you exit, or the process is s
 ## Limits
 
 - A worktree whose branch was squash-merged without a PR, or with `gh` missing or signed out, is reported as not merged. It stays until you remove it.
-- A session that is killed outright (SIGKILL, a crash) never ends cleanly, so its worktree stays marked active and is kept.
+- A session that is killed outright (SIGKILL, a crash) never ends cleanly. Its worktree stays marked active until a later session sees that the lock's process has died; a worktree with no Claude session lock is kept.
+- A worktree entered and left without a commit is kept, on a branch or a detached HEAD, even though its commit is in the default branch.
 - Herd's `links` output is assumed to match Valet's table. It has not been tried.
 - The whole flow was tested against a faked machine. It has not run against a real Herd.
 

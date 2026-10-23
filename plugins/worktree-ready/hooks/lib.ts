@@ -127,8 +127,34 @@ export const jsPlan = (files: string[], hasBuild: boolean): JsPlan => {
   return { lock: found[0], install: found[1], build: hasBuild ? found[2] : null }
 }
 
-export const certBase = (tool: Tool, home: string, host: string): string =>
-  tool === 'herd' ? `${home}/Library/Application Support/Herd/config/valet/Certificates/${host}` : `${home}/.config/valet/Certificates/${host}`
+export const sitesDir = (tool: Tool, home: string): string => `${valetConfig(tool, home)}/Sites`
+
+const valetConfig = (tool: Tool, home: string): string => (tool === 'herd' ? `${home}/Library/Application Support/Herd/config/valet` : `${home}/.config/valet`)
+
+export const certBase = (tool: Tool, home: string, host: string): string => `${valetConfig(tool, home)}/Certificates/${host}`
+
+export const siteFiles = (tool: Tool, home: string, host: string): { nginx: string; certs: string[] } => ({
+  nginx: `${valetConfig(tool, home)}/Nginx/${host}`,
+  certs: ['crt', 'key', 'csr', 'conf'].map(extension => `${certBase(tool, home, host)}.${extension}`),
+})
+
+export const siteLink = (tool: Tool, home: string, name: string): string => `${sitesDir(tool, home)}/${name}`
+
+export const SCAN_SITES = 'for l in "$1"/*; do [ -L "$l" ] && printf "%s\\t%s\\n" "${l##*/}" "$(readlink "$l")"; done; true'
+
+export const parseSiteScan = (stdout: string): { name: string; path: string }[] =>
+  stdout
+    .split('\n')
+    .filter(line => line.includes('\t'))
+    .map(line => {
+      const [name = '', path = ''] = line.split('\t')
+
+      return { name, path }
+    })
+
+export const isProxy =(nginxConfig: string): boolean => nginxConfig.includes('proxy_pass')
+
+export const inWorktrees = (path: string): boolean => path.includes('/.claude/worktrees/')
 
 export const setEnv = (text: string, key: string, value: string): string => {
   const line = `${key}=${/\s/.test(value) ? `"${value}"` : value}`

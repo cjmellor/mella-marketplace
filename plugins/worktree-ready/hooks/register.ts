@@ -1,6 +1,6 @@
 import type { EngineInterface, Register } from 'claude-code'
 
-import { ASSET_INPUTS, CLONES, JS_LOCK_FILES, TOOLS, basename, certBase, chooseTool, jsPlan, linkName, lockOf, parseLinks, parseWorktree, setEnv, shareSqlite, underWorktrees } from './lib'
+import { ASSET_INPUTS, CLONES, JS_LOCK_FILES, SCAN_SITES, TOOLS, basename, certBase, chooseTool, inWorktrees, isProxy, jsPlan, linkName, lockOf, parseLinks, parseSiteScan, parseWorktree, setEnv, shareSqlite, siteFiles, siteLink, sitesDir, underWorktrees } from './lib'
 import type { Link, Tool, WorktreeInfo, WorktreeRecord } from './lib'
 
 const PLUGIN = 'worktree-ready'
@@ -123,8 +123,10 @@ async function shareDatabase($: EngineInterface, { main, top }: WorktreeInfo) {
 
 const setAppUrl = ($: EngineInterface, top: string, url: string) => editEnv($, top, text => setEnv(text, 'APP_URL', url))
 
+const homeDir = async ($: EngineInterface) => (await run($, ['printenv', 'HOME'])).stdout.trim()
+
 async function useSiteCert($: EngineInterface, top: string, tool: Tool, url: string) {
-  const home = (await run($, ['printenv', 'HOME'])).stdout.trim()
+  const home = await homeDir($)
   const base = certBase(tool, home, new URL(url).hostname)
 
   if (!home || !(await $.fs.exists(`${base}.key`)) || !(await $.fs.exists(`${base}.crt`))) {
@@ -306,9 +308,71 @@ async function provision($: EngineInterface, dir: string): Promise<string | null
   }
 }
 
-async function dropSite($: EngineInterface, tool: Tool, name: string) {
+const isSymlink = async ($: EngineInterface, path: string) => passed(await run($, ['test', '-L', path]))
+
+async function removeLeftovers($: EngineInterface, tool: Tool, name: string, host: string): Promise<string | null> {
+  const home = await homeDir($)
+
+  if (!home) {
+    return null
+  }
+
+  const link = siteLink(tool, home, name)
+
+  if (await isSymlink($, link)) {
+    await run($, ['rm', '-f', link])
+
+    if (await isSymlink($, link)) {
+      return `${link} could not be removed`
+    }
+  }
+
+  const { nginx, certs } = siteFiles(tool, home, host)
+  const leftovers: string[] = []
+
+  if ((await $.fs.exists(nginx)) && !isProxy(String(await $.fs.read(nginx)))) {
+    leftovers.push(nginx)
+  }
+
+  for (const cert of certs) {
+    if (await $.fs.exists(cert)) {
+      leftovers.push(cert)
+    }
+  }
+
+  if (leftovers.length === 0) {
+    return null
+  }
+
+  await run($, ['rm', '-f', ...leftovers])
+
+  for (const file of leftovers) {
+    if (await $.fs.exists(file)) {
+      return `${file} could not be removed`
+    }
+  }
+
+  return null
+}
+
+async function dropSite($: EngineInterface, tool: Tool, name: string): Promise<string | null> {
+  const listed = (await listLinks($, tool))?.find(site => site.name === name)
+  const host = listed ? new URL(listed.url).hostname : `${name}.test`
+
   await run($, [tool, 'unsecure', name], undefined, SITE_MS)
   await run($, [tool, 'unlink', name], undefined, SITE_MS)
+
+  const after = await listLinks($, tool)
+
+  if (!after) {
+    return `${tool} links failed, so ${name} could not be checked`
+  }
+
+  if (after.some(site => site.name === name)) {
+    return `${name} is still linked after unlink`
+  }
+
+  return removeLeftovers($, tool, name, host)
 }
 
 async function unlink($: EngineInterface, record: WorktreeRecord): Promise<WorktreeRecord> {
@@ -316,10 +380,10 @@ async function unlink($: EngineInterface, record: WorktreeRecord): Promise<Workt
     return record
   }
 
-  await dropSite($, record.tool, record.link)
+  const problem = await dropSite($, record.tool, record.link)
 
-  if ((await listLinks($, record.tool))?.some(site => site.name === record.link)) {
-    toast($, `${record.link} is still linked after unlink`, 10_000)
+  if (problem) {
+    toast($, problem, 10_000)
 
     return record
   }
@@ -327,26 +391,25 @@ async function unlink($: EngineInterface, record: WorktreeRecord): Promise<Workt
   return { ...record, link: null }
 }
 
-async function isMerged($: EngineInterface, record: WorktreeRecord): Promise<boolean> {
-  if (!record.branch || record.branch === 'HEAD') {
-    return false
-  }
+const detached = (record: WorktreeRecord): boolean => !record.branch || record.branch === 'HEAD'
 
+async function isMerged($: EngineInterface, record: WorktreeRecord): Promise<boolean> {
   const head = await run($, ['git', 'rev-parse', 'HEAD'], record.path)
 
   if (!passed(head) || (record.base !== undefined && head.stdout.trim() === record.base)) {
     return false
   }
 
+  const tip = head.stdout.trim()
   const origin = await run($, ['git', '-C', record.main, 'symbolic-ref', '--short', 'refs/remotes/origin/HEAD'])
 
   for (const ref of [...(passed(origin) ? [origin.stdout.trim()] : []), 'main', 'master']) {
-    if (passed(await run($, ['git', '-C', record.main, 'merge-base', '--is-ancestor', record.branch, ref]))) {
+    if (passed(await run($, ['git', '-C', record.main, 'merge-base', '--is-ancestor', detached(record) ? tip : record.branch, ref]))) {
       return true
     }
   }
 
-  return prMerged($, record, head.stdout.trim())
+  return detached(record) ? false : prMerged($, record, tip)
 }
 
 async function prMerged($: EngineInterface, record: WorktreeRecord, head: string): Promise<boolean> {
@@ -414,15 +477,22 @@ async function tryRemove($: EngineInterface, record: WorktreeRecord) {
     return
   }
 
-  if (!passed(await run($, ['git', '-C', record.main, 'worktree', 'remove', record.path]))) {
+  if (!passed(await run($, ['git', '-C', record.main, 'worktree', 'remove', record.path])) || (await $.fs.exists(record.path))) {
     toast($, `${basename(record.path)} could not be removed`, 10_000)
+
+    return
+  }
+
+  await forget()
+
+  if (detached(record)) {
+    toast($, `Removed the finished worktree ${basename(record.path)}`, 10_000)
 
     return
   }
 
   const branchDropped = passed(await run($, ['git', '-C', record.main, 'branch', '-d', record.branch]))
 
-  await forget()
   toast($, branchDropped ? `Removed the finished worktree ${basename(record.path)}` : `Removed ${basename(record.path)}, but its branch ${record.branch} was kept`, 10_000)
 }
 
@@ -436,16 +506,19 @@ async function retire($: EngineInterface, top: string, removedByTool: boolean) {
   // Unlinking goes by site name, so it works after the tool has deleted the directory.
   const unlinked = await unlink($, record)
 
-  if (removedByTool) {
+  const exited: WorktreeRecord = { ...unlinked, state: 'exited' }
+
+  if (removedByTool && !exited.link) {
     await $.store.delete(recordKey(top))
 
     return
   }
 
-  const exited: WorktreeRecord = { ...unlinked, state: 'exited' }
-
   await saveRecord($, exited)
-  await tryRemove($, exited)
+
+  if (!removedByTool && !exited.link) {
+    await tryRemove($, exited)
+  }
 }
 
 async function markExited($: EngineInterface) {
@@ -460,24 +533,67 @@ async function markExited($: EngineInterface) {
   }
 }
 
-async function sweep($: EngineInterface) {
-  const main = (await $.session.repo().catch(() => null))?.root
-  const here = await $.session.cwd()
+async function sessionDied($: EngineInterface, record: WorktreeRecord): Promise<boolean> {
+  const listed = await run($, ['git', '-C', record.main, 'worktree', 'list', '--porcelain'])
+  const lock = passed(listed) ? lockOf(listed.stdout, record.path) : { kind: 'other' as const }
 
-  if (!main) {
-    return
-  }
+  return lock.kind === 'session' && !passed(await run($, ['kill', '-0', String(lock.pid)]))
+}
+
+async function sweep($: EngineInterface) {
+  const here = await $.session.cwd()
 
   for (const key of (await $.store.keys()).filter(key => key.startsWith(PREFIX))) {
     const record = (await $.store.get(key)) as WorktreeRecord | undefined
 
-    if (!record || record.main !== main || record.path === here) {
+    if (!record || here === record.path || here.startsWith(`${record.path}/`)) {
       continue
     }
 
-    if (record.state === 'exited' || !(await $.fs.exists(record.path))) {
-      await tryRemove($, await unlink($, record))
+    if (record.state === 'exited' || !(await $.fs.exists(record.path)) || (await sessionDied($, record))) {
+      const exited: WorktreeRecord = { ...(await unlink($, record)), state: 'exited' }
+
+      await saveRecord($, exited)
+
+      if (!exited.link) {
+        await tryRemove($, exited)
+      }
     }
+  }
+}
+
+async function reconcile($: EngineInterface) {
+  const tool = await findTool($, false)
+  const home = await homeDir($)
+
+  if (!tool || !home) {
+    return
+  }
+
+  const scan = await run($, ['sh', '-c', SCAN_SITES, '_', sitesDir(tool, home)])
+
+  if (!passed(scan)) {
+    return
+  }
+
+  let dropped = 0
+
+  for (const site of parseSiteScan(scan.stdout).filter(entry => inWorktrees(entry.path))) {
+    if (await $.fs.exists(site.path)) {
+      continue
+    }
+
+    const problem = await dropSite($, tool, site.name)
+
+    if (problem) {
+      toast($, problem, 10_000)
+    } else {
+      dropped++
+    }
+  }
+
+  if (dropped > 0) {
+    toast($, `Removed ${dropped} ${dropped === 1 ? 'site' : 'sites'} whose worktree folder no longer exists`, 10_000)
   }
 }
 
@@ -488,7 +604,7 @@ export const register: Register = (on, options) => {
     await provision($, await $.session.cwd()).catch(() => undefined)
 
     $.clock.after(0, () => {
-      void sweep($).catch(() => undefined)
+      void sweep($).then(() => reconcile($)).catch(() => undefined)
     })
 
     return next(e)

@@ -29,6 +29,8 @@ type World = {
   statusFails: boolean
   locked: boolean
   lockMade: number
+  branch: string
+  rmFails: boolean
 }
 
 const table = (sites: Site[]) =>
@@ -64,6 +66,8 @@ const world = (overrides: Partial<World> = {}): World => ({
   statusFails: false,
   locked: false,
   lockMade: 0,
+  branch: 'worktree-blue-heron',
+  rmFails: false,
   ...overrides,
 })
 
@@ -91,7 +95,19 @@ const respond = (w: World, argv: string[], cwd: string | undefined) => {
     return ok()
   }
   if (line.startsWith('stat -f')) return ok(`${w.lockMade}\n`)
-  if (line === 'git rev-parse --abbrev-ref HEAD') return ok('worktree-blue-heron\n')
+  if (line === 'git rev-parse --abbrev-ref HEAD') return ok(`${w.branch}\n`)
+  if (line.startsWith('rm -f ')) {
+    if (w.rmFails) return fail()
+
+    for (const file of argv.slice(2)) {
+      w.files.delete(file)
+      w.sites = w.sites.filter(site => !file.endsWith(`/Sites/${site.name}`))
+    }
+
+    return ok()
+  }
+  if (line.startsWith('test -L ')) return w.sites.some(site => (argv[2] ?? '').endsWith(`/Sites/${site.name}`)) ? ok() : fail()
+  if (line.startsWith('sh -c for l in')) return ok(w.sites.map(site => `${site.name}\t${site.path}`).join('\n'))
   if (line.startsWith(`git -C ${MAIN} diff --quiet`)) return w.sameAssets ? ok() : fail()
   if (line === 'git status --porcelain') return w.statusFails ? fail() : ok(w.dirty ? ' M app/User.php\n' : '')
   if (line.startsWith('git -C') && line.includes('symbolic-ref')) return ok('origin/main\n')
@@ -107,11 +123,11 @@ const respond = (w: World, argv: string[], cwd: string | undefined) => {
   if (line.includes('worktree remove')) {
     if (w.lock) return fail()
 
-    w.files.delete(TREE)
+    w.files.delete(argv[argv.length - 1] ?? '')
 
     return ok()
   }
-  if (line.endsWith(' links')) return ok(table(w.sites))
+  if (line.endsWith(' links')) return ok(table(w.sites.filter(site => !site.path.includes('/.claude/worktrees/') || w.files.has(site.path))))
   if (line.startsWith('valet link ')) {
     w.sites.push({ name: argv[2] ?? '', path: cwd ?? '', secure: false })
 
@@ -509,21 +525,157 @@ test('an exit the tool refused leaves the link and the record alone', async ($, 
   expect(w.store.get(`wt:${TREE}`)).toMatchObject({ state: 'active', link: NAME })
 })
 
-test('the next session removes a worktree that was left exited, and leaves links it did not make alone', async ($, on) => {
-  const w = world({ head: 'def456' })
+const exitedRecord = (overrides: Record<string, unknown> = {}) => ({ path: TREE, main: MAIN, project: 'acme', branch: 'worktree-blue-heron', base: 'abc123', tool: 'valet', link: NAME, state: 'exited', notified: false, ...overrides })
+
+const startSession = async ($: any, on: any, w: World) => {
   const clock = mock.clock(on)
 
-  w.sites.push({ name: 'acme-ghost', path: `${MAIN}/.claude/worktrees/ghost`, secure: true })
+  on('session.start', () => ({ cwd: MAIN }))
+  await $.session.start({ surface: 'terminal', isInteractive: true, cwd: MAIN })
+  await clock.advance(1)
+}
+
+test('the next session removes a worktree that was left exited, and leaves a link to a folder that exists but is not its own alone', async ($, on) => {
+  const w = world({ head: 'def456' })
+
+  w.files.add(`${MAIN}/.claude/worktrees/other`)
+  w.sites.push({ name: 'acme-other', path: `${MAIN}/.claude/worktrees/other`, secure: true })
   w.sites.push({ name: NAME, path: TREE, secure: true })
-  w.store.set(`wt:${TREE}`, { path: TREE, main: MAIN, project: 'acme', branch: 'worktree-blue-heron', base: 'abc123', tool: 'valet', link: NAME, state: 'exited', notified: false })
+  w.store.set(`wt:${TREE}`, exitedRecord())
+  stubWorld(on, w)
+  await startSession($, on, w)
+
+  expect(w.sites.map(site => site.name)).toEqual(['acme', 'acme-other'])
+  expect(ran(w, `git -C ${MAIN} worktree remove`)).toEqual([`git -C ${MAIN} worktree remove ${TREE}`])
+  expect(w.store.has(`wt:${TREE}`)).toBe(false)
+})
+
+test('the next session unlinks a site whose worktree folder is gone, even with no record of it', async ($, on) => {
+  const w = world()
+
+  w.sites.push({ name: 'acme-ghost', path: `${MAIN}/.claude/worktrees/ghost`, secure: true })
+  w.files.add('/u/.config/valet/Nginx/acme-ghost.test')
+  w.files.add('/u/.config/valet/Certificates/acme-ghost.test.crt')
+  w.files.add('/u/.config/valet/Certificates/acme-ghost.test.key')
+  stubWorld(on, w)
+  await startSession($, on, w)
+
+  expect(w.sites.map(site => site.name)).toEqual(['acme'])
+  expect(ran(w, 'valet unsecure')).toEqual(['valet unsecure acme-ghost'])
+  expect(w.files.has('/u/.config/valet/Nginx/acme-ghost.test')).toBe(false)
+  expect(w.files.has('/u/.config/valet/Certificates/acme-ghost.test.crt')).toBe(false)
+  expect(w.files.has('/u/.config/valet/Certificates/acme-ghost.test.key')).toBe(false)
+  expect(w.toasts).toContain('Removed 1 site whose worktree folder no longer exists')
+})
+
+test('a nginx file left behind after unlink is removed, and a proxy config of the same name is not', async ($, on) => {
+  const w = world()
+
+  w.sites.push({ name: 'acme-ghost', path: `${MAIN}/.claude/worktrees/ghost`, secure: true })
+  w.files.add('/u/.config/valet/Nginx/acme-ghost.test')
+  w.texts.set('/u/.config/valet/Nginx/acme-ghost.test', 'server { proxy_pass http://127.0.0.1:8095; }')
+  stubWorld(on, w)
+  await startSession($, on, w)
+
+  expect(w.sites.map(site => site.name)).toEqual(['acme'])
+  expect(ran(w, 'rm -f')).toEqual([])
+  expect(w.files.has('/u/.config/valet/Nginx/acme-ghost.test')).toBe(true)
+})
+
+test('files that cannot be removed are reported and keep the worktree, and the next session finishes the job', async ($, on) => {
+  const w = world({ head: 'def456', rmFails: true })
+  const clock = mock.clock(on)
+  const key = `/u/.config/valet/Certificates/${NAME}.test.key`
+
+  w.sites.push({ name: NAME, path: TREE, secure: true })
+  w.files.add(key)
+  w.store.set(`wt:${TREE}`, exitedRecord())
   stubWorld(on, w)
   on('session.start', () => ({ cwd: MAIN }))
   await $.session.start({ surface: 'terminal', isInteractive: true, cwd: MAIN })
   await clock.advance(1)
 
-  expect(w.sites.map(site => site.name)).toEqual(['acme', 'acme-ghost'])
+  expect(w.toasts.some(text => text.includes(`${NAME}.test.key could not be removed`))).toBe(true)
+  expect(w.store.get(`wt:${TREE}`)).toMatchObject({ link: NAME, state: 'exited' })
+  expect(ran(w, `git -C ${MAIN} worktree remove`)).toEqual([])
+  expect(w.files.has(key)).toBe(true)
+
+  w.rmFails = false
+  await $.session.start({ surface: 'terminal', isInteractive: true, cwd: MAIN })
+  await clock.advance(1)
+
+  expect(w.files.has(key)).toBe(false)
   expect(ran(w, `git -C ${MAIN} worktree remove`)).toEqual([`git -C ${MAIN} worktree remove ${TREE}`])
   expect(w.store.has(`wt:${TREE}`)).toBe(false)
+})
+
+test('a worktree left on a detached HEAD that main contains is removed with no branch to delete', async ($, on) => {
+  const w = world({ head: 'def456', branch: 'HEAD' })
+
+  w.sites.push({ name: NAME, path: TREE, secure: true })
+  w.store.set(`wt:${TREE}`, exitedRecord({ branch: 'HEAD' }))
+  stubWorld(on, w)
+  await startSession($, on, w)
+
+  expect(ran(w, 'git -C /m/acme merge-base --is-ancestor def456')).not.toEqual([])
+  expect(ran(w, `git -C ${MAIN} worktree remove`)).toEqual([`git -C ${MAIN} worktree remove ${TREE}`])
+  expect(ran(w, `git -C ${MAIN} branch -d`)).toEqual([])
+  expect(w.sites.some(site => site.name === NAME)).toBe(false)
+  expect(w.toasts).toContain('Removed the finished worktree blue-heron')
+})
+
+test('a worktree left on a detached HEAD with commits main does not contain is kept', async ($, on) => {
+  const w = world({ head: 'def456', branch: 'HEAD', merged: false })
+
+  w.store.set(`wt:${TREE}`, exitedRecord({ branch: 'HEAD' }))
+  stubWorld(on, w)
+  await startSession($, on, w)
+
+  expect(ran(w, `git -C ${MAIN} worktree remove`)).toEqual([])
+  expect(ran(w, 'gh pr list')).toEqual([])
+  expect(w.toasts.some(text => text.includes('not merged'))).toBe(true)
+})
+
+test('a session in one project sweeps the exited worktrees of another', async ($, on) => {
+  const w = world({ head: 'def456' })
+  const OTHER = '/m/other'
+  const OTHER_TREE = `${OTHER}/.claude/worktrees/red-fox`
+
+  w.files.add(OTHER_TREE)
+  w.sites.push({ name: 'other-red-fox', path: OTHER_TREE, secure: true })
+  w.store.set(`wt:${OTHER_TREE}`, exitedRecord({ path: OTHER_TREE, main: OTHER, project: 'other', branch: 'worktree-red-fox', link: 'other-red-fox' }))
+  stubWorld(on, w)
+  await startSession($, on, w)
+
+  expect(w.sites.some(site => site.name === 'other-red-fox')).toBe(false)
+  expect(ran(w, `git -C ${OTHER} worktree remove`)).toEqual([`git -C ${OTHER} worktree remove ${OTHER_TREE}`])
+  expect(w.store.has(`wt:${OTHER_TREE}`)).toBe(false)
+})
+
+test('a worktree still marked active whose session died is cleaned up, and one whose session runs is left alone', async ($, on) => {
+  const dead = world({ head: 'def456', lock: 'locked claude session blue-heron (pid 4242 start Mon Oct 19 19:58:21 2026)', lockHolderAlive: false })
+
+  dead.sites.push({ name: NAME, path: TREE, secure: true })
+  dead.store.set(`wt:${TREE}`, exitedRecord({ state: 'active' }))
+  stubWorld(on, dead)
+  await startSession($, on, dead)
+
+  expect(dead.sites.some(site => site.name === NAME)).toBe(false)
+  expect(ran(dead, `git -C ${MAIN} worktree remove`)).toEqual([`git -C ${MAIN} worktree remove ${TREE}`])
+})
+
+test('a worktree whose session is still running keeps its site and folder', async ($, on) => {
+  const live = world({ head: 'def456', lock: 'locked claude session blue-heron (pid 4242 start Mon Oct 19 19:58:21 2026)', lockHolderAlive: true })
+
+  live.sites.push({ name: NAME, path: TREE, secure: true })
+  live.store.set(`wt:${TREE}`, exitedRecord({ state: 'active' }))
+  stubWorld(on, live)
+  await startSession($, on, live)
+
+  expect(live.sites.some(site => site.name === NAME)).toBe(true)
+  expect(ran(live, 'valet unlink')).toEqual([])
+  expect(ran(live, `git -C ${MAIN} worktree remove`)).toEqual([])
+  expect(live.store.get(`wt:${TREE}`)).toMatchObject({ state: 'active', link: NAME })
 })
 
 test('a worktree .env copied in earlier still gets main\'s sqlite file, and the path comes from the tool result not the session', async ($, on) => {
