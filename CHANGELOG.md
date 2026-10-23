@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.25.0] - 2026-10-23
+
+### Removed
+
+- **`worktree-ready` no longer supports Herd** (worktree-ready → v0.4.0). Valet is the only site tool, so the "Site tool" option, the Herd paths and the prompt shown when both are installed are gone. The mod links a worktree with Valet when it is on the PATH and otherwise sets the worktree up without a site.
+
 ## [1.24.0] - 2026-10-23
 
 ### Fixed
