@@ -265,15 +265,15 @@ test('a site name that already points elsewhere is never overwritten', async ($,
   expect(w.texts.get(`${TREE}/.env`)).toBe('APP_NAME=Acme\nAPP_URL=http://acme.test\n')
 })
 
-test('with both tools installed and no choice made, nothing is linked and the user is told', async ($, on) => {
-  const w = world({ installed: ['valet', 'herd'] })
+test('without Valet installed, the worktree is set up but nothing is linked', async ($, on) => {
+  const w = world({ installed: [] })
 
   stubWorld(on, w)
   on('tool.call', enter(w))
   await $.tool.call({ tool: 'EnterWorktree', name: 'blue-heron' })
 
   expect(ran(w, 'valet link ')).toEqual([])
-  expect(w.toasts.some(text => text.includes('both installed'))).toBe(true)
+  expect(w.toasts).toContain('Worktree ready')
 })
 
 test('a main checkout that is not a Laravel worktree is left alone', async ($, on) => {

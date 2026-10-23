@@ -1,4 +1,4 @@
-export type Tool = 'valet' | 'herd'
+export type Tool = 'valet'
 
 export type Link = { name: string; secure: boolean; url: string; path: string }
 
@@ -17,8 +17,6 @@ export type WorktreeRecord = {
 }
 
 export type JsPlan = { lock: string | null; install: string[] | null; build: string[] | null }
-
-export const TOOLS: Tool[] = ['valet', 'herd']
 
 // Never add public/hot or bootstrap/cache: they carry main's dev-server URL and its cached config.
 export const CLONES = ['vendor', 'node_modules', 'public/build']
@@ -100,23 +98,6 @@ export const lockOf = (porcelain: string, path: string): WorktreeLock => {
 
 export const underWorktrees =(main: string, path: string): boolean => path.startsWith(`${main}/.claude/worktrees/`)
 
-export const chooseTool = (
-  configured: string,
-  installed: Tool[],
-): { tool: Tool | null; reason: 'none' | 'both' | 'missing' | null } => {
-  const wanted = configured.trim().toLowerCase()
-
-  if (wanted === 'valet' || wanted === 'herd') {
-    return installed.includes(wanted) ? { tool: wanted, reason: null } : { tool: null, reason: 'missing' }
-  }
-
-  if (installed.length === 1) {
-    return { tool: installed[0] ?? null, reason: null }
-  }
-
-  return { tool: null, reason: installed.length === 0 ? 'none' : 'both' }
-}
-
 export const jsPlan = (files: string[], hasBuild: boolean): JsPlan => {
   const found = JS_LOCKS.find(([lock]) => files.includes(lock))
 
@@ -127,18 +108,16 @@ export const jsPlan = (files: string[], hasBuild: boolean): JsPlan => {
   return { lock: found[0], install: found[1], build: hasBuild ? found[2] : null }
 }
 
-export const sitesDir = (tool: Tool, home: string): string => `${valetConfig(tool, home)}/Sites`
+export const sitesDir = (home: string): string => `${home}/.config/valet/Sites`
 
-const valetConfig = (tool: Tool, home: string): string => (tool === 'herd' ? `${home}/Library/Application Support/Herd/config/valet` : `${home}/.config/valet`)
+export const certBase = (home: string, host: string): string => `${home}/.config/valet/Certificates/${host}`
 
-export const certBase = (tool: Tool, home: string, host: string): string => `${valetConfig(tool, home)}/Certificates/${host}`
-
-export const siteFiles = (tool: Tool, home: string, host: string): { nginx: string; certs: string[] } => ({
-  nginx: `${valetConfig(tool, home)}/Nginx/${host}`,
-  certs: ['crt', 'key', 'csr', 'conf'].map(extension => `${certBase(tool, home, host)}.${extension}`),
+export const siteFiles = (home: string, host: string): { nginx: string; certs: string[] } => ({
+  nginx: `${home}/.config/valet/Nginx/${host}`,
+  certs: ['crt', 'key', 'csr', 'conf'].map(extension => `${certBase(home, host)}.${extension}`),
 })
 
-export const siteLink = (tool: Tool, home: string, name: string): string => `${sitesDir(tool, home)}/${name}`
+export const siteLink = (home: string, name: string): string => `${sitesDir(home)}/${name}`
 
 export const SCAN_SITES = 'for l in "$1"/*; do [ -L "$l" ] && printf "%s\\t%s\\n" "${l##*/}" "$(readlink "$l")"; done; true'
 

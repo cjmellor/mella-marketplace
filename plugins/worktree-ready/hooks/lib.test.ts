@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { certBase, chooseTool, inWorktrees, isProxy, jsPlan, linkName, lockOf, parseLinks, parseSiteScan, parseWorktree, setEnv, shareSqlite, siteFiles, siteLink, underWorktrees } from './lib'
+import { certBase, inWorktrees, isProxy, jsPlan, linkName, lockOf, parseLinks, parseSiteScan, parseWorktree, setEnv, shareSqlite, siteFiles, siteLink, underWorktrees } from './lib'
 
 test('reads who holds a worktree lock from git worktree list --porcelain', () => {
   const list = [
@@ -16,17 +16,15 @@ test('reads who holds a worktree lock from git worktree list --porcelain', () =>
   expect(lockOf(list, '/m/acme')).toEqual({ kind: 'none' })
 })
 
-test('finds the site certificate where Valet or Herd keeps it', () => {
-  expect(certBase('valet', '/u', 'acme-wt.test')).toBe('/u/.config/valet/Certificates/acme-wt.test')
-  expect(certBase('herd', '/u', 'acme-wt.test')).toBe('/u/Library/Application Support/Herd/config/valet/Certificates/acme-wt.test')
+test('finds the site certificate where Valet keeps it', () => {
+  expect(certBase('/u', 'acme-wt.test')).toBe('/u/.config/valet/Certificates/acme-wt.test')
 })
 
-test('lists every file Valet or Herd keeps for a site, and tells a proxy config from a plain site', () => {
-  expect(siteFiles('valet', '/u', 'acme-wt.test')).toEqual({
+test('lists every file Valet keeps for a site, and tells a proxy config from a plain site', () => {
+  expect(siteFiles('/u', 'acme-wt.test')).toEqual({
     nginx: '/u/.config/valet/Nginx/acme-wt.test',
     certs: ['crt', 'key', 'csr', 'conf'].map(extension => `/u/.config/valet/Certificates/acme-wt.test.${extension}`),
   })
-  expect(siteFiles('herd', '/u', 'acme-wt.test').nginx).toBe('/u/Library/Application Support/Herd/config/valet/Nginx/acme-wt.test')
   expect(isProxy('location / {\n  proxy_pass http://127.0.0.1:8095;\n}')).toBe(true)
   expect(isProxy('location / {\n  rewrite ^ /server.php last;\n}')).toBe(false)
 })
@@ -37,7 +35,7 @@ test('reads the site symlinks Valet hides once their folder is gone', () => {
     { name: 'acme-ghost', path: '/m/acme/.claude/worktrees/ghost' },
   ])
   expect(parseSiteScan('')).toEqual([])
-  expect(siteLink('valet', '/u', 'acme-ghost')).toBe('/u/.config/valet/Sites/acme-ghost')
+  expect(siteLink('/u', 'acme-ghost')).toBe('/u/.config/valet/Sites/acme-ghost')
 })
 
 test('only paths under a .claude/worktrees folder count as worktree sites', () => {
@@ -92,15 +90,6 @@ test('only worktrees Claude made under the project are ours to remove', () => {
   expect(underWorktrees('/m/acme', '/m/acme/.claude/worktrees/x')).toBe(true)
   expect(underWorktrees('/m/acme', '/elsewhere/x')).toBe(false)
   expect(underWorktrees('/m/acme', '/m/acme')).toBe(false)
-})
-
-test('picks the site tool from the setting and what is installed', () => {
-  expect(chooseTool('auto', ['valet'])).toEqual({ tool: 'valet', reason: null })
-  expect(chooseTool('auto', ['herd'])).toEqual({ tool: 'herd', reason: null })
-  expect(chooseTool('auto', ['valet', 'herd'])).toEqual({ tool: null, reason: 'both' })
-  expect(chooseTool('auto', [])).toEqual({ tool: null, reason: 'none' })
-  expect(chooseTool('herd', ['valet', 'herd'])).toEqual({ tool: 'herd', reason: null })
-  expect(chooseTool('herd', ['valet'])).toEqual({ tool: null, reason: 'missing' })
 })
 
 test('the JS package manager follows the lockfile, and a build runs only when there is a script', () => {

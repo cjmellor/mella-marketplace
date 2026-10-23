@@ -52,9 +52,9 @@
     {
       "name": "worktree-ready",
       "source": "./plugins/worktree-ready",
-      "description": "Makes a new git worktree of a Laravel app ready with no hands: copy-on-write clones of vendor, node_modules and built assets, a Valet or Herd HTTPS site, and clean-up once the work is merged, after you leave or the session ends.",
+      "description": "Makes a new git worktree of a Laravel app ready with no hands: copy-on-write clones of vendor, node_modules and built assets, a Valet HTTPS site, and clean-up once the work is merged, after you leave or the session ends.",
       "version": "0.3.0",
-      "keywords": ["laravel", "worktree", "valet", "herd", "mod", "copy-on-write"],
+      "keywords": ["laravel", "worktree", "valet", "mod", "copy-on-write"],
       "license": "MIT"
     },
     {

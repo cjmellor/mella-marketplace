@@ -1,6 +1,6 @@
 import type { EngineInterface, Register } from 'claude-code'
 
-import { ASSET_INPUTS, CLONES, JS_LOCK_FILES, SCAN_SITES, TOOLS, basename, certBase, chooseTool, inWorktrees, isProxy, jsPlan, linkName, lockOf, parseLinks, parseSiteScan, parseWorktree, setEnv, shareSqlite, siteFiles, siteLink, sitesDir, underWorktrees } from './lib'
+import { ASSET_INPUTS, CLONES, JS_LOCK_FILES, SCAN_SITES, basename, certBase, inWorktrees, isProxy, jsPlan, linkName, lockOf, parseLinks, parseSiteScan, parseWorktree, setEnv, shareSqlite, siteFiles, siteLink, sitesDir, underWorktrees } from './lib'
 import type { Link, Tool, WorktreeInfo, WorktreeRecord } from './lib'
 
 const PLUGIN = 'worktree-ready'
@@ -9,8 +9,6 @@ const LONG_MS = 600_000
 const SITE_MS = 120_000
 const STALE_LOCK_MS = 1_800_000
 const NOT_LINKED = { url: null, linked: false }
-
-let configured = 'auto'
 
 type Outcome = { exitCode: number; stdout: string; stderr: string }
 
@@ -64,26 +62,8 @@ async function worktreeAt($: EngineInterface, dir: string): Promise<WorktreeInfo
   return passed(rev) ? parseWorktree(rev.stdout) : null
 }
 
-async function findTool($: EngineInterface, notify: boolean): Promise<Tool | null> {
-  const installed: Tool[] = []
-
-  for (const tool of TOOLS) {
-    if (passed(await run($, ['sh', '-c', `command -v ${tool}`]))) {
-      installed.push(tool)
-    }
-  }
-
-  const { tool, reason } = chooseTool(configured, installed)
-
-  if (notify && reason === 'both') {
-    toast($, 'Valet and Herd are both installed: set the "Site tool" option to choose one', 10_000)
-  }
-
-  if (notify && reason === 'missing') {
-    toast($, `${configured} is not installed, so the site is not linked`, 10_000)
-  }
-
-  return tool
+async function findTool($: EngineInterface): Promise<Tool | null> {
+  return passed(await run($, ['sh', '-c', 'command -v valet'])) ? 'valet' : null
 }
 
 async function listLinks($: EngineInterface, tool: Tool): Promise<Link[] | null> {
@@ -125,9 +105,9 @@ const setAppUrl = ($: EngineInterface, top: string, url: string) => editEnv($, t
 
 const homeDir = async ($: EngineInterface) => (await run($, ['printenv', 'HOME'])).stdout.trim()
 
-async function useSiteCert($: EngineInterface, top: string, tool: Tool, url: string) {
+async function useSiteCert($: EngineInterface, top: string, url: string) {
   const home = await homeDir($)
-  const base = certBase(tool, home, new URL(url).hostname)
+  const base = certBase(home, new URL(url).hostname)
 
   if (!home || !(await $.fs.exists(`${base}.key`)) || !(await $.fs.exists(`${base}.crt`))) {
     return
@@ -241,7 +221,7 @@ async function setUp($: EngineInterface, info: WorktreeInfo): Promise<string | n
 
   const project = basename(main)
   const name = linkName(project, basename(top), top)
-  const tool = await findTool($, true)
+  const tool = await findTool($)
   const site = tool ? await link($, tool, name, top) : NOT_LINKED
 
   if (site.url) {
@@ -249,7 +229,7 @@ async function setUp($: EngineInterface, info: WorktreeInfo): Promise<string | n
   }
 
   if (site.url && tool) {
-    await useSiteCert($, top, tool, site.url)
+    await useSiteCert($, top, site.url)
   }
 
   const branch = (await run($, ['git', 'rev-parse', '--abbrev-ref', 'HEAD'], top)).stdout.trim()
@@ -310,14 +290,14 @@ async function provision($: EngineInterface, dir: string): Promise<string | null
 
 const isSymlink = async ($: EngineInterface, path: string) => passed(await run($, ['test', '-L', path]))
 
-async function removeLeftovers($: EngineInterface, tool: Tool, name: string, host: string): Promise<string | null> {
+async function removeLeftovers($: EngineInterface, name: string, host: string): Promise<string | null> {
   const home = await homeDir($)
 
   if (!home) {
     return null
   }
 
-  const link = siteLink(tool, home, name)
+  const link = siteLink(home, name)
 
   if (await isSymlink($, link)) {
     await run($, ['rm', '-f', link])
@@ -327,7 +307,7 @@ async function removeLeftovers($: EngineInterface, tool: Tool, name: string, hos
     }
   }
 
-  const { nginx, certs } = siteFiles(tool, home, host)
+  const { nginx, certs } = siteFiles(home, host)
   const leftovers: string[] = []
 
   if ((await $.fs.exists(nginx)) && !isProxy(String(await $.fs.read(nginx)))) {
@@ -372,7 +352,7 @@ async function dropSite($: EngineInterface, tool: Tool, name: string): Promise<s
     return `${name} is still linked after unlink`
   }
 
-  return removeLeftovers($, tool, name, host)
+  return removeLeftovers($, name, host)
 }
 
 async function unlink($: EngineInterface, record: WorktreeRecord): Promise<WorktreeRecord> {
@@ -563,14 +543,14 @@ async function sweep($: EngineInterface) {
 }
 
 async function reconcile($: EngineInterface) {
-  const tool = await findTool($, false)
+  const tool = await findTool($)
   const home = await homeDir($)
 
   if (!tool || !home) {
     return
   }
 
-  const scan = await run($, ['sh', '-c', SCAN_SITES, '_', sitesDir(tool, home)])
+  const scan = await run($, ['sh', '-c', SCAN_SITES, '_', sitesDir(home)])
 
   if (!passed(scan)) {
     return
@@ -597,9 +577,7 @@ async function reconcile($: EngineInterface) {
   }
 }
 
-export const register: Register = (on, options) => {
-  configured = String(options.tool ?? 'auto')
-
+export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await provision($, await $.session.cwd()).catch(() => undefined)
 

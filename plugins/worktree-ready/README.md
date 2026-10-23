@@ -8,7 +8,7 @@ worktree-ready is a Claude Code mod. When Claude enters a worktree of a Laravel 
 
 - A Claude Code build that loads plugin modules (mods).
 - macOS on APFS. Dependencies are cloned with `cp -c`, a copy-on-write clone, so the worktree must be on the same volume as the main checkout (worktrees under `.claude/worktrees/` always are).
-- Laravel Valet or Herd. Without one the worktree is still set up, it just is not linked.
+- Laravel Valet. Without it the worktree is still set up, it just is not linked.
 - `composer`, and your JS package manager, on the PATH.
 
 ## What happens when a worktree is entered
@@ -35,19 +35,13 @@ A session that ends while it is inside a worktree (you exit, or the process is s
 
 Valet's `links` hides a site once its folder is gone, so the same start-of-session pass also reads the `Sites` folder and removes every site that points under a `.claude/worktrees/` folder that no longer exists, whether or not the mod set it up. Only worktrees under a project's `.claude/worktrees/` that the mod set up are ever removed.
 
-## Options
-
-| Option | Default | What it does |
-|--------|---------|--------------|
-| Site tool | `auto` | `valet`, `herd` or `auto`. Auto uses whichever is installed and does nothing when both are, with a toast asking you to choose. |
-
 ## Limits
 
 - A worktree whose branch was squash-merged without a PR, or with `gh` missing or signed out, is reported as not merged. It stays until you remove it.
 - A session that is killed outright (SIGKILL, a crash) never ends cleanly. Its worktree stays marked active until a later session sees that the lock's process has died; a worktree with no Claude session lock is kept.
 - A worktree entered and left without a commit is kept, on a branch or a detached HEAD, even though its commit is in the default branch.
-- Herd's `links` output is assumed to match Valet's table. It has not been tried.
-- The whole flow was tested against a faked machine. It has not run against a real Herd.
+- Valet is the only supported site tool.
+- The enter and exit flows were tested against a faked machine. The start-of-session site cleanup was also run against a real Valet.
 
 ## Development
 
