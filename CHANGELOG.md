@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.24.0] - 2026-10-23
+
+### Fixed
+
+- **`worktree-ready` no longer leaves dead Valet sites behind** (worktree-ready → v0.3.0). Valet's `links` hides a site once its worktree folder is gone, so those sites and their nginx and certificate files piled up. Each session start now reads Valet's `Sites` folder and removes every site that points under a missing `.claude/worktrees` folder, in any project, and cleans up worktrees whose Claude session has died. Unlinking checks that the symlink, nginx config and certificates are gone, deletes what is left (never a proxy config), and keeps the worktree until the site is fully removed. A worktree on a detached HEAD whose commit is in the default branch now counts as merged, and removal checks the folder is gone.
+
 ## [1.23.0] - 2026-10-21
 
 ### Added
